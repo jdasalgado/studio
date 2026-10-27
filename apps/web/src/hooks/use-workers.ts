@@ -67,7 +67,13 @@ export function useWorkers(params: {
     });
 
     const createWithAuthMutation = useMutation({
-        mutationFn: ({ data, roleIds, assignedBy }: { data: any; roleIds: string[]; assignedBy?: string }) => createWorkerWithAuth(data, roleIds, assignedBy),
+        mutationFn: async ({ data, roleIds, assignedBy }: { data: any; roleIds: string[]; assignedBy?: string }) => {
+            const res = await createWorkerWithAuth(data, roleIds, assignedBy);
+            if (res && (res.success === false || res.error)) {
+                throw new Error(res.error || 'Failed to create worker');
+            }
+            return res;
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['workers'] });
             queryClient.invalidateQueries({ queryKey: ['worker-stats'] });

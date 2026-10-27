@@ -205,6 +205,22 @@ export class NotificationService {
         if (!recipientEmail && approval?.requester && approval.requester.includes('@')) {
             recipientEmail = approval.requester;
         }
+        if (!recipientEmail && (approval?.requester || booking?.name)) {
+            const nameSearch = (approval?.requester || booking?.name || '').trim();
+            const parts = nameSearch.split(/\s+/);
+            if (parts.length >= 2) {
+                const found = await prisma.worker.findFirst({
+                    where: {
+                        firstName: { equals: parts[0], mode: 'insensitive' },
+                        lastName: { equals: parts.slice(1).join(' '), mode: 'insensitive' },
+                    },
+                    select: { email: true }
+                }).catch(() => null);
+                if (found?.email) {
+                    recipientEmail = found.email;
+                }
+            }
+        }
         if (recipientEmail) {
             recipientEmail = recipientEmail.trim();
         }
@@ -410,16 +426,20 @@ Church of God Dasmariñas
             </div>
         `;
 
-        await EmailService.sendEmail({
-            to: recipientEmail,
-            subject,
-            html,
-            text,
-            attachments,
-        });
-
-        console.log(`[NotificationService] Room reservation final approval email sent to worker ${recipientEmail} for room "${roomName}" (Request ID: ${requestId})`);
-        return { success: true };
+        try {
+            await EmailService.sendEmail({
+                to: recipientEmail,
+                subject,
+                html,
+                text,
+                attachments,
+            });
+            console.log(`[NotificationService] Room reservation final approval email sent to worker ${recipientEmail} for room "${roomName}" (Request ID: ${requestId})`);
+            return { success: true };
+        } catch (sendErr: any) {
+            console.error(`[NotificationService] Failed to send approval email to ${recipientEmail}:`, sendErr);
+            return { success: false, error: sendErr?.message || String(sendErr) };
+        }
     }
 
     /**
@@ -696,16 +716,20 @@ Church of God Dasmariñas
             </div>
         `;
 
-        await EmailService.sendEmail({
-            to: recipientEmail,
-            subject,
-            html,
-            text,
-            attachments,
-        });
-
-        console.log(`[NotificationService] Room reservation rejection email sent to worker ${recipientEmail} for room "${roomName}" (Request ID: ${requestId})`);
-        return { success: true };
+        try {
+            await EmailService.sendEmail({
+                to: recipientEmail,
+                subject,
+                html,
+                text,
+                attachments,
+            });
+            console.log(`[NotificationService] Room reservation rejection email sent to worker ${recipientEmail} for room "${roomName}" (Request ID: ${requestId})`);
+            return { success: true };
+        } catch (sendErr: any) {
+            console.error(`[NotificationService] Failed to send rejection email to ${recipientEmail}:`, sendErr);
+            return { success: false, error: sendErr?.message || String(sendErr) };
+        }
     }
 
     /**

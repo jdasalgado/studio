@@ -1,14 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@studio/ui";
-import { IBM_Plex_Sans } from "next/font/google";
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-ibm-plex-sans",
-});
 
 export const metadata: Metadata = {
   title: "COG App",
@@ -34,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={ibmPlexSans.variable} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="font-body antialiased">
         <Script
           id="theme-init"

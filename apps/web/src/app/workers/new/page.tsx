@@ -394,6 +394,14 @@ export default function NewWorkerPage() {
         termsAcceptedAt,
       };
       const newWorker: any = await createWorkerWithAuth(data, roleId ? [roleId] : [], workerProfile?.id);
+      if (!newWorker || newWorker.success === false || newWorker.error) {
+        toast({ 
+          variant: "destructive", 
+          title: "Save Failed", 
+          description: newWorker?.error || "Could not save worker profile." 
+        });
+        return;
+      }
       await logAction("Created Worker", "Workers", `Created worker: ${firstName} ${lastName} (Terms v${termsAcceptedVersion} accepted)`, newWorker.id, `${firstName} ${lastName}`);
       if (newWorker.emailSent) {
         toast({ 
@@ -404,12 +412,15 @@ export default function NewWorkerPage() {
         toast({ 
           variant: "destructive",
           title: "Worker Added (Email Failed to Send)", 
-          description: `Worker was saved, but email could not be sent: ${newWorker.emailError || "Invalid Resend API Key"}.` 
+          description: `Worker was saved, but email could not be sent: ${newWorker.emailError || "Email delivery failed"}.` 
         });
       }
       router.push("/workers");
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Save Failed", description: error.message || "Could not save worker profile." });
+      const msg = error?.message?.includes("Minified React error #441")
+        ? "Could not save worker profile. The email address may already be in use by another worker."
+        : (error?.message || "Could not save worker profile.");
+      toast({ variant: "destructive", title: "Save Failed", description: msg });
     } finally {
       setSaving(false);
     }

@@ -773,15 +773,33 @@ export async function createWorker(data: any) {
 }
 
 export async function createWorkerWithAuth(data: any, roleIds: string[], assignedBy?: string) {
+    const email = data.email?.trim().toLowerCase();
+    if (!email) {
+        return { success: false, error: 'Email address is required.' };
+    }
+
+    // 1. Check if email already exists in DB
+    const existingWorker = await prisma.worker.findUnique({
+        where: { email },
+        select: { id: true, firstName: true, lastName: true, workerId: true },
+    });
+    if (existingWorker) {
+        return {
+            success: false,
+            error: `Email "${email}" is already registered to worker ${existingWorker.firstName} ${existingWorker.lastName} (Worker ID: ${existingWorker.workerId || 'N/A'}). Please use a different email or update their existing profile.`,
+        };
+    }
+
     const supabaseAdmin = getSupabaseAdminClient();
     const defaultPassword = "COGDASMA2026";
 
     const termsVersion = data.termsAcceptedVersion || "1.0";
     const termsTimestamp = data.termsAcceptedAt || new Date().toISOString();
 
-    // Create auth user with terms metadata
+    // 2. Create or verify auth user
+    let effectiveUserId: string;
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: data.email?.trim(),
+        email,
         password: defaultPassword,
         email_confirm: true,
         user_metadata: {
@@ -793,10 +811,32 @@ export async function createWorkerWithAuth(data: any, roleIds: string[], assigne
     });
 
     if (authError) {
-        if (authError.message.includes('already registered')) {
-            throw new Error('Email is already registered. Please use another email.');
+        if (authError.message?.toLowerCase().includes('already') || (authError as any).status === 422) {
+            const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
+            const existingAuth = userList?.users?.find(u => u.email?.toLowerCase() === email);
+            if (existingAuth) {
+                const existingDbUser = await prisma.worker.findUnique({ where: { id: existingAuth.id } });
+                if (existingDbUser) {
+                    return {
+                        success: false,
+                        error: `Email "${email}" already has an active account (${existingDbUser.firstName} ${existingDbUser.lastName}). Please use a different email.`,
+                    };
+                }
+                effectiveUserId = existingAuth.id;
+            } else {
+                return {
+                    success: false,
+                    error: `Email "${email}" is already registered in authentication. Please use a different email.`,
+                };
+            }
+        } else {
+            return {
+                success: false,
+                error: `Failed to create authentication account: ${authError.message}`,
+            };
         }
-        throw new Error(`Failed to create Auth user: ${authError.message}`);
+    } else {
+        effectiveUserId = authData.user.id;
     }
 
     // Now create in DB
@@ -858,17 +898,27 @@ export async function createWorkerWithAuth(data: any, roleIds: string[], assigne
 
     const workerData = {
         ...dbData,
+        email,
         status: dbData.status || 'Active',
-        id: authData.user.id,
+        id: effectiveUserId,
         createdAt: new Date(),
     };
     if (roleIds && roleIds.length > 0) {
         workerData.roleId = roleIds[0];
     }
 
-    const worker = await prisma.worker.create({
-        data: workerData,
-    });
+    let worker: any;
+    try {
+        worker = await prisma.worker.create({
+            data: workerData,
+        });
+    } catch (createErr: any) {
+        console.error('[createWorkerWithAuth] Failed to create worker record in database:', createErr);
+        return {
+            success: false,
+            error: `Failed to save worker record in database: ${createErr?.message || String(createErr)}`,
+        };
+    }
 
     // If department selection was made, update headId for all ministries in this department
     if (isDeptSelection && deptMinistries.length > 0) {
@@ -1210,6 +1260,7 @@ Next Steps:
     invalidateServerCache('worker_stats');
     revalidatePath('/workers');
     return {
+        success: true,
         ...worker,
         emailSent,
         emailError: emailErrorMsg,
@@ -1676,36 +1727,38 @@ export async function updateApproval(id: string, data: any, actorId?: string) {
     const isRoomReservation = approval.type === 'Room Booking' || Boolean(approval.reservationId) || approval.type?.toLowerCase().includes('room');
 
     if (status === 'Approved' && previousStatus !== 'Approved' && isRoomReservation) {
-        console.log(`[updateApproval] Dispatching final approval email in background for approval ${approval.id}, booking ${approval.reservationId}...`);
-        void NotificationService.notifyRoomReservationApproved(approval.id, approval.reservationId || undefined)
-            .then((emailResult) => {
-                if (emailResult && !emailResult.success) {
-                    console.warn('[updateApproval] Background notifyRoomReservationApproved failed:', emailResult.error);
-                } else {
-                    console.log('[updateApproval] Background notifyRoomReservationApproved succeeded.');
-                }
-            })
-            .catch((emailErr) => {
-                console.error('[updateApproval] Failed to send background approval email:', emailErr);
-            });
-        emailNotificationSent = true;
+        console.log(`[updateApproval] Dispatching final approval email for approval ${approval.id}, booking ${approval.reservationId}...`);
+        try {
+            const emailResult = await NotificationService.notifyRoomReservationApproved(approval.id, approval.reservationId || undefined);
+            if (emailResult && !emailResult.success) {
+                console.warn('[updateApproval] notifyRoomReservationApproved failed:', emailResult.error);
+                emailNotificationError = emailResult.error;
+            } else {
+                console.log('[updateApproval] notifyRoomReservationApproved succeeded.');
+                emailNotificationSent = true;
+            }
+        } catch (emailErr: any) {
+            console.error('[updateApproval] Failed to send approval email:', emailErr);
+            emailNotificationError = emailErr?.message || String(emailErr);
+        }
     }
 
-    // Send rejection email in the background (non-blocking) when room reservation is rejected
+    // Send rejection email when room reservation is rejected
     if (status === 'Rejected' && previousStatus !== 'Rejected' && isRoomReservation) {
-        console.log(`[updateApproval] Dispatching rejection email in background for approval ${approval.id}, booking ${approval.reservationId}...`);
-        void NotificationService.notifyRoomReservationRejected(approval.id, approval.reservationId || undefined, rejectionReason)
-            .then((emailResult) => {
-                if (emailResult && !emailResult.success) {
-                    console.warn('[updateApproval] Background notifyRoomReservationRejected failed:', emailResult.error);
-                } else {
-                    console.log('[updateApproval] Background notifyRoomReservationRejected succeeded.');
-                }
-            })
-            .catch((emailErr) => {
-                console.error('[updateApproval] Failed to send background rejection email:', emailErr);
-            });
-        emailNotificationSent = true;
+        console.log(`[updateApproval] Dispatching rejection email for approval ${approval.id}, booking ${approval.reservationId}...`);
+        try {
+            const emailResult = await NotificationService.notifyRoomReservationRejected(approval.id, approval.reservationId || undefined, rejectionReason);
+            if (emailResult && !emailResult.success) {
+                console.warn('[updateApproval] notifyRoomReservationRejected failed:', emailResult.error);
+                emailNotificationError = emailResult.error;
+            } else {
+                console.log('[updateApproval] notifyRoomReservationRejected succeeded.');
+                emailNotificationSent = true;
+            }
+        } catch (emailErr: any) {
+            console.error('[updateApproval] Failed to send rejection email:', emailErr);
+            emailNotificationError = emailErr?.message || String(emailErr);
+        }
     }
 
     try {
@@ -2158,20 +2211,46 @@ export async function updateBooking(id: string, data: any, actorId?: string) {
             data: { status: 'Approved' },
         }).catch(err => console.error('Failed to sync approval request status from booking update:', err));
 
-        // Send approval email in background (non-blocking)
-        console.log(`[updateBooking] Dispatching final approval email in background for booking ${id}...`);
-        void NotificationService.notifyRoomReservationApproved(undefined, id)
-            .then((emailResult) => {
-                if (emailResult && !emailResult.success) {
-                    console.warn('[updateBooking] Background notifyRoomReservationApproved failed:', emailResult.error);
-                } else {
-                    console.log(`[updateBooking] notifyRoomReservationApproved succeeded for booking ${id}.`);
-                }
-            })
-            .catch((emailErr) => {
-                console.error('[updateBooking] Failed to send background approval email:', emailErr);
-            });
-        emailNotificationSent = true;
+        // Send approval email
+        console.log(`[updateBooking] Dispatching final approval email for booking ${id}...`);
+        try {
+            const emailResult = await NotificationService.notifyRoomReservationApproved(undefined, id);
+            if (emailResult && !emailResult.success) {
+                console.warn('[updateBooking] notifyRoomReservationApproved failed:', emailResult.error);
+                emailNotificationError = emailResult.error;
+            } else {
+                console.log(`[updateBooking] notifyRoomReservationApproved succeeded for booking ${id}.`);
+                emailNotificationSent = true;
+            }
+        } catch (emailErr: any) {
+            console.error('[updateBooking] Failed to send approval email:', emailErr);
+            emailNotificationError = emailErr?.message || String(emailErr);
+        }
+    }
+
+    // If transitioned to Rejected from non-rejected status
+    if (status === 'Rejected' && previousStatus !== 'Rejected') {
+        // Sync approval requests
+        await prisma.approvalRequest.updateMany({
+            where: { reservationId: id, status: { not: 'Rejected' } },
+            data: { status: 'Rejected' },
+        }).catch(err => console.error('Failed to sync approval request status from booking rejection:', err));
+
+        // Send rejection email
+        console.log(`[updateBooking] Dispatching rejection email for booking ${id}...`);
+        try {
+            const emailResult = await NotificationService.notifyRoomReservationRejected(undefined, id, (data as any).reason || (data as any).rejectionReason);
+            if (emailResult && !emailResult.success) {
+                console.warn('[updateBooking] notifyRoomReservationRejected failed:', emailResult.error);
+                emailNotificationError = emailResult.error;
+            } else {
+                console.log(`[updateBooking] notifyRoomReservationRejected succeeded for booking ${id}.`);
+                emailNotificationSent = true;
+            }
+        } catch (emailErr: any) {
+            console.error('[updateBooking] Failed to send rejection email:', emailErr);
+            emailNotificationError = emailErr?.message || String(emailErr);
+        }
     }
 
     try {
