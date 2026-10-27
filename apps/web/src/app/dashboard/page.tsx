@@ -142,12 +142,14 @@ export default function DashboardPage() {
 function AdminDashboard() {
   const [timeRange, setTimeRange] = useState<"7" | "14" | "30">("7");
 
+  const thirtyDaysAgo = useMemo(() => subDays(new Date(), 31), []);
+
   const { data: workerStats, isLoading: workerStatsLoading } = useWorkerStats();
   const { attendanceRecords, isLoading: attendanceLoading } = useAttendance({
-    dateFrom: subDays(new Date(), 31),
+    dateFrom: thirtyDaysAgo,
   });
   const { mealStubs, isLoading: mealStubsLoading } = useMealStubs({
-    dateFrom: subDays(new Date(), 31),
+    dateFrom: thirtyDaysAgo,
   });
   const { approvals, isLoading: approvalsLoading } = useApprovals();
   const { bookings, isLoading: bookingsLoading } = useBookings({});
@@ -801,13 +803,15 @@ function AdminDashboard() {
 function WorkerDashboard() {
   const { user } = useAuthStore();
   const { workerProfile } = useUserRole();
-  const activeUserId = workerProfile?.id || (user as any)?.uid;
+  const activeUserId = workerProfile?.id || user?.id || (user as any)?.uid;
+
+  const fourteenDaysAgo = useMemo(() => subDays(new Date(), 14), []);
 
   const { attendanceRecords, isLoading: attendanceLoading } = useAttendance(
-    activeUserId ? { workerProfileId: activeUserId, dateFrom: subDays(new Date(), 14) } : {}
+    activeUserId ? { workerProfileId: activeUserId, dateFrom: fourteenDaysAgo } : { enabled: false }
   );
   const { mealStubs, isLoading: mealStubsLoading } = useMealStubs(
-    activeUserId ? { workerId: activeUserId, dateFrom: subDays(new Date(), 30) } : {}
+    activeUserId ? { workerId: activeUserId } : { enabled: false }
   );
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -819,7 +823,7 @@ function WorkerDashboard() {
     }).length ?? 0;
 
   const myMealsClaimed = (mealStubs as any[])?.filter((m) => m.status === "Claimed").length ?? 0;
-  const myMealsIssued = (mealStubs as any[])?.filter((m) => m.status === "Issued").length ?? 0;
+  const totalMealsIssued = (mealStubs as any[])?.length ?? 0;
 
   // My clock-ins last 14 days
   const last14Days = Array.from({ length: 14 }, (_, i) => {
@@ -845,17 +849,17 @@ function WorkerDashboard() {
           iconClass="text-emerald-600"
           iconBgClass="bg-emerald-50 dark:bg-emerald-950/40"
           accentColor="bg-emerald-500"
-          loading={attendanceLoading}
+          loading={attendanceLoading && !attendanceRecords?.length}
         />
         <StatCard
           icon={Utensils}
           label="MEALS CLAIMED"
           value={myMealsClaimed}
-          subtitle={`of ${myMealsIssued} issued`}
+          subtitle={totalMealsIssued > 0 ? `of ${totalMealsIssued} issued` : "of 0 issued"}
           iconClass="text-orange-600"
           iconBgClass="bg-orange-50 dark:bg-orange-950/40"
           accentColor="bg-orange-500"
-          loading={mealStubsLoading}
+          loading={mealStubsLoading && !mealStubs?.length}
         />
         <StatCard
           icon={Calendar}

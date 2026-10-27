@@ -172,7 +172,7 @@ export default function NewReservationPage() {
       if (!roomId || !selectedDate) return [];
       return getBookingsForRoomOnDate(roomId, selectedDate);
     },
-    enabled: !!roomId && !!selectedDate,
+    enabled: !!roomId && !!selectedDate && !isSubmitted,
   });
 
   const getMinutesInManila = (dateInput: Date | string) => {
@@ -221,6 +221,7 @@ export default function NewReservationPage() {
 
   // Reset startTime/endTime if the newly selected room/date makes them unavailable
   useEffect(() => {
+    if (isSubmitted || isSubmitting) return;
     if (startTime && bookedRanges.length > 0) {
       const startMin = timeToMinutes(startTime);
       const isStartBooked = bookedRanges.some(
@@ -236,9 +237,10 @@ export default function NewReservationPage() {
         });
       }
     }
-  }, [roomId, selectedDate, bookedRanges, startTime, toast]);
+  }, [roomId, selectedDate, bookedRanges, startTime, isSubmitted, isSubmitting, toast]);
 
   useEffect(() => {
+    if (isSubmitted || isSubmitting) return;
     if (startTime && endTime) {
       const startMin = timeToMinutes(startTime);
       const endMin = timeToMinutes(endTime);
@@ -249,7 +251,7 @@ export default function NewReservationPage() {
         setEndTime("");
       }
     }
-  }, [startTime, endTime, bookedRanges]);
+  }, [startTime, endTime, bookedRanges, isSubmitted, isSubmitting]);
 
   // Time slots from 8:00 AM to 8:00 PM (in 30-min intervals)
   const timeSlots = useMemo(() => {

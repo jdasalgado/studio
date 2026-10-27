@@ -20,7 +20,7 @@ export function useMealStubs(filters: {
     const actorId = filters.actorId || workerProfile?.id;
     let effectiveMinistryIds = filters.ministryIds;
     if (!isSuperAdmin) {
-        if (filters.workerId && filters.workerId === workerProfile?.id) {
+        if (filters.workerId && (filters.workerId === workerProfile?.id || filters.workerId === workerProfile?.workerId || filters.workerId === actorId)) {
             // When querying their own stubs, do not restrict by ministry
             effectiveMinistryIds = undefined;
         } else if (!myMinistryIds || myMinistryIds.length === 0) {
@@ -41,8 +41,8 @@ export function useMealStubs(filters: {
         placeholderData: (prev) => prev,
     });
 
-    // When enabled=false, isPending is true but we shouldn't show a loader
-    const isLoading = enabled && isPending;
+    // When enabled=false or when data is already available or not actively fetching, don't show loader
+    const isLoading = enabled && isPending && isFetching && !data;
 
     const createMutation = useMutation({
         mutationFn: createMealStub,
