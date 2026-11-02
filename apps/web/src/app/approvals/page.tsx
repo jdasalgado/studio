@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useMemo, useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -32,7 +32,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@studio/ui";
 
-// ── Status badge ──────────────────────────────────────────────────────────────
+// â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatusBadge({ status }: { status: string }) {
   if (status === "Approved")
     return (
@@ -64,7 +64,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Avatar initials ───────────────────────────────────────────────────────────
+// â”€â”€ Avatar initials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Initials({ name }: { name: string }) {
   const parts = name.trim().split(" ");
   const init = parts.length >= 2
@@ -77,7 +77,7 @@ function Initials({ name }: { name: string }) {
   );
 }
 
-// ── Stat card (matches dashboard) ─────────────────────────────────────────────
+// â”€â”€ Stat card (matches dashboard) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatCard({
   label, value, icon: Icon, accentColor, iconClass, iconBgClass,
 }: {
@@ -107,7 +107,7 @@ function StatCard({
   );
 }
 
-// ── WORDA Department Matrix ───────────────────────────────────────────────────
+// â”€â”€ WORDA Department Matrix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const WORDA_MINISTRIES_BY_DEPT = {
   Worship: ["whitelight", "dance", "pmt", "crusade", "singers", "musicians", "audio"],
   Outreach: ["cluster 1", "cluster 2", "cluster 3", "cluster 4", "cluster 5", "cluster 6", "cluster 7", "cluster 8", "cluster 9", "weyj", "tapat"],
@@ -192,7 +192,7 @@ export function isRequestInDepartment(
   return false;
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function ApprovalsPage() {
   const {
     canManageApprovals,
@@ -252,7 +252,7 @@ export default function ApprovalsPage() {
     });
   }, [roomBookingRequests, isSuperAdmin, workerProfile, allMinistries, ministries, bookings, workers]);
 
-  // Filtered requests by search and status — sorted by most recent reservation requested first (submission time)
+  // Filtered requests by search and status â€” sorted by most recent reservation requested first (submission time)
   const filteredRequests = useMemo(() => {
     let results = [...scopedRequests];
 
@@ -336,11 +336,13 @@ export default function ApprovalsPage() {
       const workerFullName = `${workerProfile?.firstName || ""} ${workerProfile?.lastName || ""}`.trim().toLowerCase();
       const isRequestedBySelf = Boolean(
         (workerProfile?.id && request.workerId === workerProfile.id) ||
+        (workerProfile?.id && requesterWorker?.id === workerProfile.id) ||
         (workerProfile?.id && request.reservationId &&
           bookings?.find((b) => b.id === request.reservationId)?.workerProfileId === workerProfile.id) ||
         (workerFullName && request.requester?.trim().toLowerCase() === workerFullName) ||
         (workerProfile && (workerProfile as any)?.name && request.requester?.trim().toLowerCase() === (workerProfile as any).name.trim().toLowerCase())
       );
+
 
       // 1. If requester is a Ministry Head (and NOT Admin):
       // "pag si mh nag request sa account niya bawal niya approve dapat admin lang kasi mas mataas admin sa hierarchy"
@@ -350,7 +352,7 @@ export default function ApprovalsPage() {
 
       // 2. If the request was submitted by an Admin:
       // "hindi na din dapat dadaan sa Ministry head ung request ni admin"
-      // Ministry Heads cannot approve or manage Admin requests at all — only Admin can!
+      // Ministry Heads cannot approve or manage Admin requests at all â€” only Admin can!
       if (isRequesterAdmin && !isAdmin) {
         return false;
       }
@@ -621,7 +623,7 @@ export default function ApprovalsPage() {
                         purposeText = req.details;
                       }
                     }
-                    if (!purposeText) purposeText = "—";
+                    if (!purposeText) purposeText = "â€”";
 
                     const reqId = req.id || "";
                     const reqDate = booking?.dateRequested
@@ -638,21 +640,14 @@ export default function ApprovalsPage() {
                         key={reqId || Math.random().toString()}
                         className={cn(
                           "overflow-hidden rounded-none border-b border-border/60 transition-colors",
-                          isChecked ? "bg-sidebar/5 dark:bg-sidebar/10" : "bg-card"
+                          "bg-card"
                         )}
                       >
-                        {/* Blue header: Checkbox + ID + Actions */}
+                        {/* Blue header: ID + Actions */}
                         <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-sidebar">
-                          <div className="flex items-center gap-2.5">
-                            <Checkbox
-                              checked={isChecked}
-                              onCheckedChange={() => toggleSelect(reqId)}
-                              className="h-[17px] w-[17px] rounded-[4px] border-[1.5px] border-white/90 bg-transparent data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-sidebar focus-visible:ring-0 cursor-pointer shadow-xs transition-colors"
-                            />
-                            <span className="text-xs font-mono font-bold text-white">
-                              REQ-{reqId.slice(-4).toUpperCase()}
-                            </span>
-                          </div>
+                          <span className="text-xs font-mono font-bold text-white">
+                            REQ-{reqId.slice(-4).toUpperCase()}
+                          </span>
 
                           <div className="flex items-center gap-2">
                             <DropdownMenu>
@@ -688,7 +683,7 @@ export default function ApprovalsPage() {
                                   {req.requester}
                                 </span>
                                 <span className="text-[11px] text-muted-foreground block truncate">
-                                  {ministry?.name || "—"}
+                                  {ministry?.name || "â€”"}
                                 </span>
                               </div>
                             </div>
@@ -712,7 +707,7 @@ export default function ApprovalsPage() {
                                 Room
                               </p>
                               <p className="font-semibold text-foreground truncate">
-                                {room?.name || "—"}
+                                {room?.name || "â€”"}
                               </p>
                               <p className="text-muted-foreground text-[11px] truncate">
                                 {area?.name || "First Floor"}
@@ -728,7 +723,7 @@ export default function ApprovalsPage() {
                                     {format(new Date(booking.start), "MMM d, yyyy")}
                                   </p>
                                   <p className="text-muted-foreground text-[11px]">
-                                    {format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
+                                    {format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
                                   </p>
                                 </>
                               ) : reqDate ? (
@@ -736,7 +731,7 @@ export default function ApprovalsPage() {
                                   {format(reqDate, "MMM d, yyyy")}
                                 </p>
                               ) : (
-                                <p className="text-muted-foreground">—</p>
+                                <p className="text-muted-foreground">â€”</p>
                               )}
                             </div>
                             <div>
@@ -744,7 +739,7 @@ export default function ApprovalsPage() {
                                 Ministry
                               </p>
                               <p className="font-semibold text-foreground truncate">
-                                {ministry?.name || "—"}
+                                {ministry?.name || "â€”"}
                               </p>
                             </div>
                             <div>
@@ -752,7 +747,7 @@ export default function ApprovalsPage() {
                                 Created
                               </p>
                               <p className="font-semibold text-foreground truncate">
-                                {reqDate ? format(reqDate, "MMM d, yyyy") : "—"}
+                                {reqDate ? format(reqDate, "MMM d, yyyy") : "â€”"}
                               </p>
                             </div>
                           </div>
@@ -786,15 +781,7 @@ export default function ApprovalsPage() {
               <table className="w-full">
                 <thead className="bg-sidebar">
                   <tr className="bg-sidebar hover:bg-sidebar border-b border-sidebar-border/40">
-                    <th className="w-10 px-4 py-3.5 text-center">
-                      <div className="flex items-center justify-center">
-                        <Checkbox
-                          className="h-[17px] w-[17px] rounded-[4px] border-[1.5px] border-white/90 bg-transparent data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-sidebar focus-visible:ring-0 focus-visible:ring-offset-0 cursor-pointer shadow-xs transition-colors"
-                          checked={selectedIds.size === filteredRequests.length && filteredRequests.length > 0}
-                          onCheckedChange={() => toggleSelectAll()}
-                        />
-                      </div>
-                    </th>
+
                     <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap">Request ID</th>
                     <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap">Room</th>
                     <th className="px-4 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap">Purpose</th>
@@ -809,7 +796,7 @@ export default function ApprovalsPage() {
                 <tbody>
                   {filteredRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-20 text-center text-sm text-muted-foreground font-medium">
+                      <td colSpan={9} className="py-20 text-center text-sm text-muted-foreground font-medium">
                         No requests found.
                       </td>
                     </tr>
@@ -818,7 +805,7 @@ export default function ApprovalsPage() {
                       const worker = workers?.find(w => w.id === req.workerId);
                       const booking = bookings?.find(b => b.id === req.reservationId);
                       const room = rooms?.find(r => r.id === (req.roomId || booking?.roomId));
-                      const roomName = room?.name || "—";
+                      const roomName = room?.name || "â€”";
                       let purposeText = booking?.purpose || booking?.title;
                       if (!purposeText && req.details) {
                         const match = req.details.match(/^"?(.*?)"?\s+for room:\s*(.*)$/i);
@@ -828,7 +815,7 @@ export default function ApprovalsPage() {
                           purposeText = req.details;
                         }
                       }
-                      if (!purposeText) purposeText = "—";
+                      if (!purposeText) purposeText = "â€”";
 
                       const targetMinistryId = booking?.ministryId || worker?.majorMinistryId || req.newMajorId || req.oldMajorId;
                       const ministry = targetMinistryId
@@ -844,19 +831,11 @@ export default function ApprovalsPage() {
                           key={reqId || Math.random().toString()}
                           className={cn(
                             "border-b border-gray-100 dark:border-border/60 transition-colors cursor-pointer",
-                            isSelected ? "bg-primary/5" : "hover:bg-slate-50/70 dark:hover:bg-muted/30"
+                            "hover:bg-slate-50/70 dark:hover:bg-muted/30"
                           )}
                           onClick={() => setSelectedRequest(req)}
                         >
-                          <td className="px-4 py-3.5 text-center" onClick={e => { e.stopPropagation(); toggleSelect(reqId); }}>
-                            <div className="flex items-center justify-center">
-                              <Checkbox
-                                className="h-[17px] w-[17px] rounded-[4px] border-slate-300 dark:border-slate-600 data-[state=checked]:bg-sidebar data-[state=checked]:border-sidebar cursor-pointer transition-colors"
-                                checked={isSelected}
-                                onCheckedChange={() => toggleSelect(reqId)}
-                              />
-                            </div>
-                          </td>
+
                           <td className="px-5 py-3.5 text-xs font-mono text-muted-foreground whitespace-nowrap font-medium">
                             REQ-{reqId.slice(-4).toUpperCase()}
                           </td>
@@ -873,7 +852,7 @@ export default function ApprovalsPage() {
                               </div>
                             </td>
                             <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap font-medium">
-                              {ministry?.name || "—"}
+                              {ministry?.name || "â€”"}
                             </td>
                             <td className="px-5 py-3.5 whitespace-nowrap">
                               {booking?.start ? (
@@ -884,7 +863,7 @@ export default function ApprovalsPage() {
                                   <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
                                     <Clock className="h-3 w-3 text-slate-400 shrink-0" />
                                     <span>
-                                      {format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
+                                      {format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
                                     </span>
                                   </p>
                                 </div>
@@ -895,7 +874,7 @@ export default function ApprovalsPage() {
                                   </p>
                                 </div>
                               ) : (
-                                <span className="text-xs text-muted-foreground font-medium">—</span>
+                                <span className="text-xs text-muted-foreground font-medium">â€”</span>
                               )}
                             </td>
                             <td className="px-5 py-3.5 text-center whitespace-nowrap">
@@ -978,7 +957,7 @@ export default function ApprovalsPage() {
                         <Initials name={req.requester} />
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-foreground leading-tight truncate">{req.requester}</p>
-                          <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{ministry?.name || "—"}</p>
+                          <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{ministry?.name || "â€”"}</p>
                         </div>
                       </div>
                       <StatusBadge status={req.status} />
@@ -997,9 +976,9 @@ export default function ApprovalsPage() {
                       <div className="mt-2.5 flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                         <Clock className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                         <span className="font-semibold text-foreground">{format(new Date(booking.start), "MMM d, yyyy")}</span>
-                        <span>•</span>
+                        <span>â€¢</span>
                         <span className="text-slate-600 dark:text-slate-300">
-                          {format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
+                          {format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
                         </span>
                       </div>
                     ) : req.date ? (
@@ -1009,7 +988,7 @@ export default function ApprovalsPage() {
                       </div>
                     ) : null}
 
-                    {/* Action buttons — always at bottom */}
+                    {/* Action buttons â€” always at bottom */}
                     <div className="mt-auto pt-4 border-t border-slate-200/80 dark:border-border/60 flex items-center gap-2" onClick={e => e.stopPropagation()}>
                       {canManage && isPending ? (
                         <>
@@ -1096,7 +1075,7 @@ export default function ApprovalsPage() {
                             <Initials name={req.requester} />
                             <div>
                               <p className="text-sm font-bold text-foreground leading-tight">{req.requester}</p>
-                              <p className="text-[11px] text-muted-foreground">{ministry?.name || "—"}</p>
+                              <p className="text-[11px] text-muted-foreground">{ministry?.name || "â€”"}</p>
                             </div>
                           </div>
 
@@ -1111,8 +1090,8 @@ export default function ApprovalsPage() {
                             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                               <Clock className="h-3 w-3 text-slate-500 shrink-0" />
                               <span className="font-semibold text-foreground">{format(new Date(booking.start), "MMM d, yyyy")}</span>
-                              <span>•</span>
-                              <span>{format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}</span>
+                              <span>â€¢</span>
+                              <span>{format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}</span>
                             </div>
                           ) : req.date ? (
                             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">

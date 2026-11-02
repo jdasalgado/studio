@@ -203,7 +203,7 @@ function StatCard({
   );
 }
 
-type CategoryTab = "ALL" | "STOCKS" | "AUTH" | "WORKERS";
+type CategoryTab = "ALL" | "AUTH" | "WORKERS";
 
 export default function ActivityLogsPage() {
   const { isSuperAdmin, isLoading: isRoleLoading } = useUserRole();
@@ -320,18 +320,7 @@ export default function ActivityLogsPage() {
     let result = allLogs;
 
     // 1. Category Tab Filter
-    if (categoryTab === "STOCKS") {
-      result = result.filter(
-        (l) =>
-          (l.module || "").toLowerCase().includes("stock") ||
-          (l.module || "").toLowerCase() === "inventory" ||
-          (l.action || "").toLowerCase().includes("stock") ||
-          (l.action || "").toLowerCase().includes("borrow") ||
-          (l.action || "").toLowerCase().includes("item") ||
-          (l.action || "").toLowerCase().includes("checkout") ||
-          (l.action || "").toLowerCase().includes("return")
-      );
-    } else if (categoryTab === "AUTH") {
+    if (categoryTab === "AUTH") {
       result = result.filter(
         (l) =>
           (l.module || "").toLowerCase() === "auth" ||
@@ -531,7 +520,6 @@ export default function ActivityLogsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap items-center gap-2 pb-2.5 border-b border-border/60">
             {[
               { id: "ALL", label: "All Activities", count: allLogs.length },
-              { id: "STOCKS", label: "Stock Monitoring", count: stats.stockCount },
               { id: "AUTH", label: "Logins & Logouts" },
               { id: "WORKERS", label: "Workers & Accounts" },
             ].map((tab) => {

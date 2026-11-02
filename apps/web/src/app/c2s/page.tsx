@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -32,6 +32,10 @@ import {
   AvatarImage,
   Sheet,
   SheetContent,
+  DatePicker,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
@@ -152,7 +156,7 @@ import {
 
 const EMPTY_ARRAY: any[] = [];
 
-// ── StatCard Component (Consistent with Dashboard & Attendance) ───────────────
+// â”€â”€ StatCard Component (Consistent with Dashboard & Attendance) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatCard({
   label,
   value,
@@ -191,7 +195,7 @@ function StatCard({
   );
 }
 
-// ─── DYNAMIC CURRICULUM DATA ───────────────────────────────────────────────
+// â”€â”€â”€ DYNAMIC CURRICULUM DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const C2S_CURRICULUM: Record<
   string,
   { module: string; lessons: string[] }[]
@@ -276,7 +280,174 @@ export const C2S_CURRICULUM: Record<
   ],
 };
 
-// ─── SUBMISSION FORM MODAL COMPONENT ──────────────────────────────────────
+// â”€â”€â”€ SUBMISSION FORM MODAL COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── CUSTOM TIME PICKER COMPONENT ────────────────────────────────────────────
+function parseTime(timeStr: string) {
+  const [hStr, mStr] = (timeStr || "09:00").split(":");
+  let h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h)) h = 9;
+  const isPM = h >= 12;
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  const mValid = isNaN(m) ? 0 : m;
+  return {
+    hour: h12,
+    minute: mValid,
+    period: isPM ? ("PM" as const) : ("AM" as const),
+    formatted12: `${String(h12).padStart(2, "0")}:${String(mValid).padStart(2, "0")} ${isPM ? "PM" : "AM"}`,
+  };
+}
+
+function toTime24(hour12: number, minute: number, period: "AM" | "PM") {
+  let h = hour12 % 12;
+  if (period === "PM") h += 12;
+  return `${String(h).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function TimePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { hour, minute, period, formatted12 } = useMemo(() => parseTime(value), [value]);
+
+  const handleSetTime = (newH: number, newM: number, newP: "AM" | "PM") => {
+    onChange(toTime24(newH, newM, newP));
+  };
+
+  const setNow = () => {
+    const now = new Date();
+    onChange(format(now, "HH:mm"));
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="group flex items-center justify-between px-3 h-10 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-border rounded-xl bg-white dark:bg-muted/30 shadow-2xs w-full hover:border-sidebar/50 focus:outline-hidden focus:ring-1 focus:ring-sidebar/40 transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-2 truncate">
+            <Clock className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 shrink-0 group-hover:text-sidebar transition-colors" />
+            <span className="font-semibold text-slate-800 dark:text-slate-100">{formatted12}</span>
+          </div>
+          <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="end"
+        sideOffset={6}
+        className="w-[280px] p-3.5 rounded-2xl border border-slate-200/90 dark:border-border bg-white dark:bg-card shadow-2xl text-slate-900 dark:text-slate-100 select-none space-y-3"
+      >
+        {/* Header Preview & Quick Now */}
+        <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
+          <div className="flex items-center gap-1.5 font-bold font-mono text-base text-foreground tracking-tight">
+            <span className="px-1.5 py-0.5 rounded-md bg-muted text-foreground">
+              {String(hour).padStart(2, "0")}
+            </span>
+            <span>:</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-muted text-foreground">
+              {String(minute).padStart(2, "0")}
+            </span>
+            <span className="ml-1 text-xs font-bold text-primary px-1.5 py-0.5 rounded-md bg-primary/10">
+              {period}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={setNow}
+            className="text-[11px] font-bold text-sidebar dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <Clock className="h-3 w-3" />
+            Current Time
+          </button>
+        </div>
+
+        {/* AM / PM Pills */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-muted/50 border border-border/50">
+          {(["AM", "PM"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => handleSetTime(hour, minute, p)}
+              className={cn(
+                "py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                period === p
+                  ? "bg-sidebar text-white shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* Hours Selector */}
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hour</p>
+          <div className="grid grid-cols-6 gap-1">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => handleSetTime(h, minute, period)}
+                className={cn(
+                  "h-7 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  hour === h
+                    ? "bg-sidebar text-white font-bold shadow-2xs"
+                    : "hover:bg-muted text-foreground/80"
+                )}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Minutes Selector */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Minute</p>
+            <input
+              type="number"
+              min={0}
+              max={59}
+              value={minute}
+              onChange={(e) => {
+                const val = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
+                handleSetTime(hour, val, period);
+              }}
+              className="w-12 h-6 text-center text-xs font-mono font-bold border border-border rounded-md bg-background focus:ring-1 focus:ring-sidebar focus:outline-hidden"
+            />
+          </div>
+          <div className="grid grid-cols-6 gap-1">
+            {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => handleSetTime(hour, m, period)}
+                className={cn(
+                  "h-7 rounded-lg text-[11px] font-mono font-semibold transition-all cursor-pointer",
+                  minute === m
+                    ? "bg-sidebar text-white font-bold shadow-2xs"
+                    : "hover:bg-muted text-foreground/80"
+                )}
+              >
+                :{String(m).padStart(2, "0")}
+              </button>
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface DevotionFormProps {
   devotion: C2SDevotionRecord | null;
   groups: any[];
@@ -314,14 +485,28 @@ const DevotionForm = ({
     devotion?.moduleName || availableModules[0]?.module || ""
   );
 
-  const availableLessons = useMemo(() => {
-    const mod = availableModules.find((m) => m.module === selectedModule);
-    return mod?.lessons || [];
+  const effectiveModule = useMemo(() => {
+    if (availableModules.some((m) => m.module === selectedModule)) {
+      return selectedModule;
+    }
+    return availableModules[0]?.module || "";
   }, [availableModules, selectedModule]);
+
+  const availableLessons = useMemo(() => {
+    const mod = availableModules.find((m) => m.module === effectiveModule);
+    return mod?.lessons || [];
+  }, [availableModules, effectiveModule]);
 
   const [selectedLesson, setSelectedLesson] = useState<string>(
     devotion?.lessonName || availableLessons[0] || ""
   );
+
+  const effectiveLesson = useMemo(() => {
+    if (availableLessons.includes(selectedLesson)) {
+      return selectedLesson;
+    }
+    return availableLessons[0] || "";
+  }, [availableLessons, selectedLesson]);
 
   const [customTopic, setCustomTopic] = useState(devotion?.topic || "");
   const [scripture, setScripture] = useState(devotion?.scripture || "");
@@ -427,6 +612,51 @@ const DevotionForm = ({
 
   const handleManualChange = (newManual: string) => {
     setManualType(newManual);
+    const newModules = C2S_CURRICULUM[newManual] || [];
+
+    // Find next available module & lesson for this new manual and selected mentee
+    const menteeNameLower = selectedMenteeName.toLowerCase().trim();
+    const menteeDevos = (allDevotions || []).filter((d) => {
+      if (!menteeNameLower) return false;
+      const isMentee = d.attendeeNames?.some(
+        (n) => n.toLowerCase().trim() === menteeNameLower
+      );
+      if (!isMentee) return false;
+      if (devotion?.id && d.id === devotion.id) return false;
+      const dManual = d.manualType || "C2S Devotional Manual";
+      return dManual === newManual;
+    });
+
+    const flat: { moduleName: string; lessonName: string }[] = [];
+    newModules.forEach((mod) => {
+      mod.lessons.forEach((les) => {
+        flat.push({ moduleName: mod.module, lessonName: les });
+      });
+    });
+
+    const completed = new Set<number>();
+    menteeDevos.forEach((d) => {
+      const idx = flat.findIndex(
+        (item) =>
+          (d.lessonName && item.lessonName.toLowerCase() === d.lessonName.toLowerCase()) ||
+          (d.topic && item.lessonName.toLowerCase() === d.topic.toLowerCase()) ||
+          (d.moduleName && d.lessonName && item.moduleName === d.moduleName && item.lessonName === d.lessonName)
+      );
+      if (idx !== -1) completed.add(idx);
+    });
+
+    let nextIdx = 0;
+    while (completed.has(nextIdx) && nextIdx < flat.length - 1) {
+      nextIdx++;
+    }
+
+    const nextItem = flat[nextIdx] || flat[0];
+    const targetModule = nextItem?.moduleName || newModules[0]?.module || "";
+    const targetLesson = nextItem?.lessonName || newModules[0]?.lessons[0] || "";
+
+    setSelectedModule(targetModule);
+    setSelectedLesson(targetLesson);
+    setCustomTopic(targetLesson);
   };
 
   const handleModuleChange = (newModule: string) => {
@@ -443,13 +673,16 @@ const DevotionForm = ({
     setCustomTopic(newLesson);
   };
 
-  // Timestamp (defaults to current date & time)
-  const defaultTimestamp = () => {
-    const now = devotion?.devotionDate ? toJsDate(devotion.devotionDate) : new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
+  // Date and Time states (default to devotion date or current time)
+  const getInitialDateTime = () => {
+    const dt = devotion?.devotionDate ? toJsDate(devotion.devotionDate) : new Date();
+    return {
+      date: format(dt, "yyyy-MM-dd"),
+      time: format(dt, "HH:mm"),
+    };
   };
-  const [devotionDateTime, setDevotionDateTime] = useState<string>(defaultTimestamp());
+  const [selectedDate, setSelectedDate] = useState<string>(() => getInitialDateTime().date);
+  const [selectedTime, setSelectedTime] = useState<string>(() => getInitialDateTime().time);
 
   // Cluster & Group: defaults to current worker's assigned group or ministry
   const userMinistryGroup = groups.find(
@@ -493,8 +726,8 @@ const DevotionForm = ({
       setScripture(devotion.scripture || "");
       if (devotion.devotionDate) {
         const d = toJsDate(devotion.devotionDate);
-        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-        setDevotionDateTime(d.toISOString().slice(0, 16));
+        setSelectedDate(format(d, "yyyy-MM-dd"));
+        setSelectedTime(format(d, "HH:mm"));
       }
       setGroupId(devotion.groupId || groups[0]?.id || "");
       setCustomCluster(devotion.clusterName || "");
@@ -643,7 +876,10 @@ const DevotionForm = ({
         lessonName: selectedLesson,
         topic: finalTopic,
         scripture,
-        devotionDate: new Date(devotionDateTime),
+        devotionDate: (() => {
+          const finalDt = new Date(`${selectedDate}T${selectedTime}:00`);
+          return isNaN(finalDt.getTime()) ? new Date() : finalDt;
+        })(),
         groupId: groupId || null,
         clusterName: effectiveClusterName,
         mentorId: mentorId || currentWorker?.id || "mentor-unknown",
@@ -673,7 +909,7 @@ const DevotionForm = ({
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full">
       <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
-      {/* ── NO MENTEES WARNING ── */}
+      {/* â”€â”€ NO MENTEES WARNING â”€â”€ */}
       {menteeOptions.length === 0 && (
         <div className="p-3.5 rounded-2xl border border-amber-200/90 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5 shadow-2xs">
           <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
@@ -686,9 +922,10 @@ const DevotionForm = ({
         </div>
       )}
 
-      {/* ── ROW 1: MENTEE & DATE ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
+      {/* â”€â”€ ROW 1: MENTEE & DATE â”€â”€ */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+        {/* Mentee Selection */}
+        <div className="space-y-1.5 sm:col-span-5">
           <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
             Mentee <span className="text-red-500 ml-0.5">*</span>
           </Label>
@@ -710,20 +947,34 @@ const DevotionForm = ({
           </Select>
         </div>
 
-        <div className="space-y-1.5">
+        {/* Date Selection */}
+        <div className="space-y-1.5 sm:col-span-4">
           <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-            Date & Time <span className="text-red-500 ml-0.5">*</span>
+            Date <span className="text-red-500 ml-0.5">*</span>
           </Label>
-          <Input
-            type="datetime-local"
-            value={devotionDateTime}
-            onChange={(e) => setDevotionDateTime(e.target.value)}
-            className="h-10 rounded-xl border border-slate-200/90 dark:border-border text-xs bg-white dark:bg-muted/30 shadow-2xs font-medium focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
+          <DatePicker
+            value={selectedDate}
+            onChange={(d) => d && setSelectedDate(d)}
+            className="w-full h-10 rounded-xl border border-slate-200/90 dark:border-border text-xs bg-white dark:bg-muted/30 shadow-2xs font-medium"
+            align="start"
+          />
+        </div>
+
+        {/* Time Selection */}
+        <div className="space-y-1.5 sm:col-span-3">
+          <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Time <span className="text-red-500 ml-0.5">*</span>
+          </Label>
+          <TimePicker
+            value={selectedTime}
+            onChange={setSelectedTime}
           />
         </div>
       </div>
 
-      {/* ── ROW 2: CURRICULUM & LESSON CARD ── */}
+
+
+      {/* â”€â”€ ROW 2: CURRICULUM & LESSON CARD â”€â”€ */}
       <div className="rounded-2xl border border-border/70 bg-slate-50/60 dark:bg-muted/20 p-4 space-y-4">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-primary/10 text-primary shrink-0">
@@ -782,13 +1033,13 @@ const DevotionForm = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Select Module</Label>
-            <Select value={selectedModule} onValueChange={handleModuleChange}>
+            <Select value={effectiveModule} onValueChange={handleModuleChange}>
               <SelectTrigger className="h-10 rounded-xl border border-slate-200/90 dark:border-border text-xs bg-white dark:bg-background shadow-2xs font-semibold text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-sidebar/40 focus:border-sidebar cursor-pointer">
                 <SelectValue placeholder="Select Module" />
               </SelectTrigger>
               <SelectContent className="max-h-60 rounded-xl border border-border shadow-xl">
                 {availableModules.map((m, mIdx) => {
-                  const isModuleUnlocked = isSuperAdmin || mIdx <= highestUnlockedModuleIndex;
+                  const isModuleUnlocked = mIdx <= highestUnlockedModuleIndex;
                   return (
                     <SelectItem
                       key={m.module}
@@ -806,23 +1057,21 @@ const DevotionForm = ({
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Select Lesson</Label>
-            <Select value={selectedLesson} onValueChange={handleLessonChange}>
+            <Select value={effectiveLesson} onValueChange={handleLessonChange}>
               <SelectTrigger className="h-10 rounded-xl border border-slate-200/90 dark:border-border text-xs bg-white dark:bg-background shadow-2xs font-semibold text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-sidebar/40 focus:border-sidebar cursor-pointer">
                 <SelectValue placeholder="Select Lesson" />
               </SelectTrigger>
               <SelectContent className="max-h-60 rounded-xl border border-border shadow-xl">
                 {availableLessons.map((l) => {
                   const lessonItem = flatCurriculum.find(
-                    (item) => item.moduleName === selectedModule && item.lessonName === l
+                    (item) => item.moduleName === effectiveModule && item.lessonName === l
                   );
                   const isCompleted = lessonItem
                     ? completedGlobalIndices.has(lessonItem.globalIndex)
                     : false;
-                  const isUnlocked =
-                    isSuperAdmin ||
-                    (lessonItem
-                      ? lessonItem.globalIndex <= maxUnlockedIndex || isCompleted
-                      : true);
+                  const isUnlocked = lessonItem
+                    ? lessonItem.globalIndex <= maxUnlockedIndex || isCompleted
+                    : false;
 
                   return (
                     <SelectItem
@@ -841,7 +1090,7 @@ const DevotionForm = ({
         </div>
       </div>
 
-      {/* ── ROW 3: REFLECTION ── */}
+      {/* â”€â”€ ROW 3: REFLECTION â”€â”€ */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
           Reflection & Key Takeaways <span className="text-red-500 ml-0.5">*</span>
@@ -856,7 +1105,7 @@ const DevotionForm = ({
         />
       </div>
 
-      {/* ── ROW 4: PRAYER REQUESTS ── */}
+      {/* â”€â”€ ROW 4: PRAYER REQUESTS â”€â”€ */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
           Prayer Requests
@@ -871,7 +1120,7 @@ const DevotionForm = ({
         />
       </div>
 
-      {/* ── ROW 5: PHOTO PROOF ── */}
+      {/* â”€â”€ ROW 5: PHOTO PROOF â”€â”€ */}
       <div className="rounded-2xl border border-border/70 bg-slate-50/60 dark:bg-muted/20 p-4 space-y-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-sidebar/10 text-sidebar dark:text-sky-400 shrink-0">
@@ -905,7 +1154,7 @@ const DevotionForm = ({
               </div>
               <p className="text-xs font-bold text-foreground">Click to upload photo proof</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Horizontal / Landscape orientation • Up to 25MB
+                Horizontal / Landscape orientation â€¢ Up to 25MB
               </p>
             </div>
           </label>
@@ -928,7 +1177,7 @@ const DevotionForm = ({
       </div>
       </div>
 
-      {/* ── STICKY FOOTER ACTIONS (ALWAYS FIXED AT BOTTOM) ── */}
+      {/* â”€â”€ STICKY FOOTER ACTIONS (ALWAYS FIXED AT BOTTOM) â”€â”€ */}
       <div className="p-3.5 sm:p-4 border-t border-border/70 bg-card/95 backdrop-blur-md shrink-0 flex items-center justify-end gap-2.5 sticky bottom-0 z-10 shadow-xs">
         <Button
           type="button"
@@ -958,7 +1207,7 @@ const DevotionForm = ({
   );
 };
 
-// ─── PHOTO LIGHTBOX / DETAILS MODAL ───────────────────────────────────────
+// â”€â”€â”€ PHOTO LIGHTBOX / DETAILS MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DevotionDetailsModal = ({
   devotion,
   isOpen,
@@ -987,7 +1236,7 @@ const DevotionDetailsModal = ({
         className="rounded-3xl bg-white dark:bg-card border border-border/80 shadow-2xl p-0 overflow-hidden flex flex-col gap-0 [&>button:last-child]:hidden"
         style={{ width: "min(calc(100vw - 2rem), 48rem)", maxHeight: "min(calc(100svh - 4rem), 90vh)" }}
       >
-        {/* ── MODAL HEADER (Matches Image 2 Style) ── */}
+        {/* â”€â”€ MODAL HEADER (Matches Image 2 Style) â”€â”€ */}
         <div className="p-5 pb-4 border-b border-border/70 bg-card/80 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3.5 min-w-0 flex-1">
@@ -1006,7 +1255,7 @@ const DevotionDetailsModal = ({
                     <span>{formattedDate}</span>
                     {formattedTime && (
                       <>
-                        <span className="opacity-40">•</span>
+                        <span className="opacity-40">â€¢</span>
                         <span>{formattedTime}</span>
                       </>
                     )}
@@ -1046,7 +1295,7 @@ const DevotionDetailsModal = ({
           </div>
         </div>
 
-        {/* ── MODAL SCROLLABLE BODY ── */}
+        {/* â”€â”€ MODAL SCROLLABLE BODY â”€â”€ */}
         <div className="p-6 overflow-y-auto space-y-5">
           {/* Curriculum Hierarchy Breadcrumb Tag */}
           <div className="flex items-center gap-2 text-xs font-semibold text-sidebar dark:text-sky-400 flex-wrap bg-sidebar/5 dark:bg-sidebar/10 p-3.5 rounded-2xl border border-sidebar/15">
@@ -1054,11 +1303,11 @@ const DevotionDetailsModal = ({
             {devotion.manualType && <span>{devotion.manualType}</span>}
             {devotion.moduleName && (
               <>
-                <span className="text-muted-foreground/60">•</span>
+                <span className="text-muted-foreground/60">â€¢</span>
                 <span>{devotion.moduleName}</span>
               </>
             )}
-            <span className="text-muted-foreground/60">•</span>
+            <span className="text-muted-foreground/60">â€¢</span>
             <span className="font-bold text-foreground">{devotion.lessonName || devotion.topic}</span>
           </div>
 
@@ -1685,7 +1934,7 @@ const MenteeForm = ({
   );
 };
 
-// ── Department Visual Metadata Helper (Matching WORDA reference diagram) ───────
+// â”€â”€ Department Visual Metadata Helper (Matching WORDA reference diagram) â”€â”€â”€â”€â”€â”€â”€
 function getDepartmentMeta(deptName: string) {
   const upper = (deptName || "").toUpperCase();
   if (upper.includes("WORSHIP") || upper === "W") {
@@ -1748,10 +1997,10 @@ function getDepartmentMeta(deptName: string) {
   };
 }
 
-// ── Standard 5 Departments in Strict WORDA Order ──
+// â”€â”€ Standard 5 Departments in Strict WORDA Order â”€â”€
 const WORDA_ORDER = ["WORSHIP", "OUTREACH", "RELATIONSHIP", "DISCIPLESHIP", "ADMINISTRATION"] as const;
 
-// ── Default 40 Ministries mapped by WORDA Department ──
+// â”€â”€ Default 40 Ministries mapped by WORDA Department â”€â”€
 const DEFAULT_DEPARTMENT_CLUSTERS: Record<string, { value: string; label: string }[]> = {
   WORSHIP: [
     { value: "Whitelight", label: "Whitelight" },
@@ -1925,7 +2174,7 @@ const AdminOverview = ({
             .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
           const lastSessionDate = menteeDevos[0]?.devotionDate
             ? format(toJsDate(menteeDevos[0].devotionDate), "MMM dd, yyyy")
-            : "—";
+            : "â€”";
 
           const progressPct =
             m.status === "Completed"
@@ -2006,7 +2255,7 @@ const AdminOverview = ({
         : 0;
       const status = completionPct < 55 ? "Needs Attention" : "Active";
 
-      // Derive head name from departmentSettings.headId → workers
+      // Derive head name from departmentSettings.headId â†’ workers
       const deptSetting = departmentSettings?.find((s: any) => {
         const sid = (s.id || "").toUpperCase();
         const sname = (s.name || "").toUpperCase();
@@ -2017,7 +2266,7 @@ const AdminOverview = ({
         : null;
       const headName = headWorker
         ? `${headWorker.firstName} ${headWorker.lastName}`
-        : "—";
+        : "â€”";
 
       const clusters = (clusterList || []).map((c) => {
         const matchingGroups = groups.filter((g) =>
@@ -2134,7 +2383,7 @@ const AdminOverview = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* ── TOP KPI SUMMARY CARDS (4 CARDS) ── */}
+      {/* â”€â”€ TOP KPI SUMMARY CARDS (4 CARDS) â”€â”€ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="DEPARTMENTS"
@@ -2174,15 +2423,15 @@ const AdminOverview = ({
         />
       </div>
 
-      {/* ── SECTION DIVIDER ── */}
+      {/* â”€â”€ SECTION DIVIDER â”€â”€ */}
       <Separator className="bg-slate-200 dark:bg-slate-700/80 h-[1px]" />
 
-      {/* ── DEPARTMENT CARDS GRID (3 COLUMNS) STRICTLY IN WORDA ORDER ── */}
+      {/* â”€â”€ DEPARTMENT CARDS GRID (3 COLUMNS) STRICTLY IN WORDA ORDER â”€â”€ */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {departmentStats.map((dept) => {
           const meta = getDepartmentMeta(dept.rawDept || dept.department);
           const DeptIcon = meta.icon;
-          const initials = dept.headName !== "—"
+          const initials = dept.headName !== "â€”"
             ? dept.headName
               .split(" ")
               .map((n: string) => n[0])
@@ -2237,14 +2486,14 @@ const AdminOverview = ({
                 {/* Department Head Box */}
                 <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 dark:bg-muted/20 border border-slate-100 dark:border-border/40">
                   <div className="w-7 h-7 rounded-full bg-sidebar/10 text-sidebar dark:bg-sidebar/30 dark:text-sidebar-foreground font-bold text-[10px] flex items-center justify-center shrink-0">
-                    {dept.headName !== "—" ? initials : "?"}
+                    {dept.headName !== "â€”" ? initials : "?"}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Department Head
                     </p>
                     <p className="text-xs font-semibold text-foreground truncate">
-                      {dept.headName !== "—" ? dept.headName : "Unassigned"}
+                      {dept.headName !== "â€”" ? dept.headName : "Unassigned"}
                     </p>
                   </div>
                 </div>
@@ -2304,7 +2553,7 @@ const AdminOverview = ({
         })}
       </div>
 
-      {/* ── RECENT DEVOTION SESSIONS & PHOTO PROOFS (HIDDEN ON DESKTOP VIEW) ── */}
+      {/* â”€â”€ RECENT DEVOTION SESSIONS & PHOTO PROOFS (HIDDEN ON DESKTOP VIEW) â”€â”€ */}
       <div className="space-y-3 pt-2 md:hidden">
         <div className="flex items-center justify-between">
           <div>
@@ -2370,7 +2619,7 @@ const AdminOverview = ({
                       {dev.lessonName || dev.topic}
                     </h4>
                     <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
-                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "Mentor"}</span> • Mentees: {dev.attendeeNames?.join(", ") || "Mentee"}
+                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "Mentor"}</span> â€¢ Mentees: {dev.attendeeNames?.join(", ") || "Mentee"}
                     </p>
                   </div>
                 </div>
@@ -2380,7 +2629,7 @@ const AdminOverview = ({
         )}
       </div>
 
-      {/* ── DEPARTMENT DETAILS & MINISTRIES / MENTEES DIALOG ── */}
+      {/* â”€â”€ DEPARTMENT DETAILS & MINISTRIES / MENTEES DIALOG â”€â”€ */}
       <Dialog
         open={!!viewingDept}
         onOpenChange={(open) => {
@@ -2537,7 +2786,7 @@ const AdminOverview = ({
             )}
           </div>
 
-          {/* ── VIEW 1: MINISTRIES UNDER THIS DEPARTMENT ── */}
+          {/* â”€â”€ VIEW 1: MINISTRIES UNDER THIS DEPARTMENT â”€â”€ */}
           {activeDetailTab === "ministries" && (
             <div className="space-y-3 pt-2">
               {(!viewingDept?.clusters || viewingDept.clusters.length === 0) ? (
@@ -2561,7 +2810,7 @@ const AdminOverview = ({
                               {cluster.name}
                             </h5>
                             <p className="text-[11px] text-muted-foreground">
-                              {cluster.groupsCount} groups • {cluster.mentorsCount} mentors
+                              {cluster.groupsCount} groups â€¢ {cluster.mentorsCount} mentors
                             </p>
                           </div>
                         </div>
@@ -2583,7 +2832,7 @@ const AdminOverview = ({
             </div>
           )}
 
-          {/* ── VIEW 2: MENTORS & THEIR ASSIGNED MENTEES ── */}
+          {/* â”€â”€ VIEW 2: MENTORS & THEIR ASSIGNED MENTEES â”€â”€ */}
           {activeDetailTab === "mentors" && (
             <div className="space-y-4 pt-2">
               {detailMinistryFilter !== "all" && (
@@ -2632,7 +2881,7 @@ const AdminOverview = ({
                               </Badge>
                             </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {mentor.email || mentor.phone || "Mentor"} {mentor.groupsCount > 0 ? `• ${mentor.groupsCount} active group(s)` : ""}
+                              {mentor.email || mentor.phone || "Mentor"} {mentor.groupsCount > 0 ? `â€¢ ${mentor.groupsCount} active group(s)` : ""}
                             </p>
                           </div>
                         </div>
@@ -2674,7 +2923,7 @@ const AdminOverview = ({
                                     </div>
                                     <div className="min-w-0">
                                       <p className="font-semibold text-foreground text-xs truncate">{me.fullName}</p>
-                                      <p className="text-[10px] text-muted-foreground truncate">{me.ministryName} {me.email ? `• ${me.email}` : ""}</p>
+                                      <p className="text-[10px] text-muted-foreground truncate">{me.ministryName} {me.email ? `â€¢ ${me.email}` : ""}</p>
                                     </div>
                                   </div>
                                   <Badge variant="secondary" className={cn(statusColorClass, "px-2 py-0.5 rounded-full text-[10px] font-bold border-transparent shrink-0")}>
@@ -2693,7 +2942,7 @@ const AdminOverview = ({
             </div>
           )}
 
-          {/* ── VIEW 3: ALL MENTEES UNDER THIS DEPARTMENT ── */}
+          {/* â”€â”€ VIEW 3: ALL MENTEES UNDER THIS DEPARTMENT â”€â”€ */}
           {activeDetailTab === "mentees" && (
             <div className="space-y-3 pt-2">
               {detailMinistryFilter !== "all" && (
@@ -2739,7 +2988,7 @@ const AdminOverview = ({
                           <div className="min-w-0">
                             <p className="font-bold text-sm text-foreground truncate">{m.fullName}</p>
                             <p className="text-[11px] text-muted-foreground truncate">
-                              {m.ministryName} • {m.mentorName ? `Mentor: ${m.mentorName}` : "No mentor"}
+                              {m.ministryName} â€¢ {m.mentorName ? `Mentor: ${m.mentorName}` : "No mentor"}
                             </p>
                           </div>
                         </div>
@@ -2975,7 +3224,7 @@ const C2SAnalytics = ({
       const totalMentees = filteredMentees.length || 0;
       const totalDevCount = filteredDevotions.length || 0;
 
-      // ── Sheet 1: Analytics Overview ──
+      // â”€â”€ Sheet 1: Analytics Overview â”€â”€
       const overviewData: any[][] = [
         ["CONNECT 2 SOULS - ANALYTICS SUMMARY REPORT"],
         ["Scope / Filter", selectedCluster === "all" ? `All ${formattedDeptName} Ministries` : selectedCluster],
@@ -3002,7 +3251,7 @@ const C2SAnalytics = ({
         { wch: 45 },
       ];
 
-      // ── Sheet 2: Cluster Breakdown ──
+      // â”€â”€ Sheet 2: Cluster Breakdown â”€â”€
       const clusterRows = clusterDevotionsData.map((c) => [
         c.name,
         c.count,
@@ -3027,7 +3276,7 @@ const C2SAnalytics = ({
         { wch: 15 },
       ];
 
-      // ── Sheet 3: Devotions Log ──
+      // â”€â”€ Sheet 3: Devotions Log â”€â”€
       const devotionsHeaders = [
         "Date",
         "Lesson Topic",
@@ -3040,12 +3289,12 @@ const C2SAnalytics = ({
 
       const devotionsRows = filteredDevotions.map((d) => [
         d.devotionDate ? format(toJsDate(d.devotionDate), "yyyy-MM-dd") : "",
-        d.lessonName || d.topic || "—",
-        d.clusterName || "—",
-        d.mentorName || "—",
+        d.lessonName || d.topic || "â€”",
+        d.clusterName || "â€”",
+        d.mentorName || "â€”",
         d.attendeeCount || (d.attendeeNames || []).length || 0,
-        (d.attendeeNames || []).join(", ") || "—",
-        d.prayerRequests || "—",
+        (d.attendeeNames || []).join(", ") || "â€”",
+        d.prayerRequests || "â€”",
       ]);
 
       const devotionsSheet = XLSX.utils.aoa_to_sheet([
@@ -3066,7 +3315,7 @@ const C2SAnalytics = ({
         { wch: 45 },
       ];
 
-      // ── Sheet 4: Mentees List ──
+      // â”€â”€ Sheet 4: Mentees List â”€â”€
       const menteeHeaders = [
         "Mentee Name",
         "Status",
@@ -3076,11 +3325,11 @@ const C2SAnalytics = ({
       ];
 
       const menteeRows = filteredMentees.map((m) => [
-        m.fullName || `${m.firstName || ""} ${m.lastName || ""}`.trim() || "—",
+        m.fullName || `${m.firstName || ""} ${m.lastName || ""}`.trim() || "â€”",
         m.status || "In Progress",
-        m.groupName || m.clusterName || "—",
-        m.mentorName || "—",
-        m.contactNumber || "—",
+        m.groupName || m.clusterName || "â€”",
+        m.mentorName || "â€”",
+        m.contactNumber || "â€”",
       ]);
 
       const menteesSheet = XLSX.utils.aoa_to_sheet([
@@ -3099,7 +3348,7 @@ const C2SAnalytics = ({
         { wch: 20 },
       ];
 
-      // ── Build Workbook & Append Sheets ──
+      // â”€â”€ Build Workbook & Append Sheets â”€â”€
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, overviewSheet, "Analytics Overview");
       XLSX.utils.book_append_sheet(workbook, clusterSheet, "Cluster Breakdown");
@@ -3125,7 +3374,7 @@ const C2SAnalytics = ({
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* ── TOP KPI SUMMARY CARDS (4 CARDS) ── */}
+      {/* â”€â”€ TOP KPI SUMMARY CARDS (4 CARDS) â”€â”€ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="DEVOTIONS LOGGED"
@@ -3165,10 +3414,10 @@ const C2SAnalytics = ({
         />
       </div>
 
-      {/* ── SECTION DIVIDER ── */}
+      {/* â”€â”€ SECTION DIVIDER â”€â”€ */}
       <Separator className="bg-slate-200 dark:bg-slate-700/80 h-[1px]" />
 
-      {/* ── FILTER & ACTION TOOLBAR (Consistent with Devotions & Mentees Tabs) ── */}
+      {/* â”€â”€ FILTER & ACTION TOOLBAR (Consistent with Devotions & Mentees Tabs) â”€â”€ */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-white dark:bg-card p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-border shadow-xs">
         {/* Dynamic Cluster/Sub-Ministry Filter: Only shown for Ministry Head / Admin */}
         {(isSuperAdmin || isMinistryHead || isHeadOrAdmin) && (
@@ -3237,7 +3486,7 @@ const C2SAnalytics = ({
         </div>
       </div>
 
-      {/* ── ANALYTICS CHARTS GRID ── */}
+      {/* â”€â”€ ANALYTICS CHARTS GRID â”€â”€ */}
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl border border-gray-200/80 dark:border-border/80 bg-white dark:bg-card shadow-xs p-5 sm:p-6 flex flex-col justify-between">
           <div className="flex items-start justify-between gap-3 mb-4">
@@ -3315,10 +3564,10 @@ const C2SAnalytics = ({
         </div>
       </div>
 
-      {/* ── SECTION DIVIDER ── */}
+      {/* â”€â”€ SECTION DIVIDER â”€â”€ */}
       <Separator className="bg-slate-200 dark:bg-slate-700/80 h-[1px]" />
 
-      {/* ── RECENT DEVOTION SESSIONS & PHOTO PROOFS ── */}
+      {/* â”€â”€ RECENT DEVOTION SESSIONS & PHOTO PROOFS â”€â”€ */}
       <div className="space-y-4 pt-1">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
@@ -3388,7 +3637,7 @@ const C2SAnalytics = ({
                       {dev.lessonName || dev.topic}
                     </h4>
                     <p className="text-xs text-muted-foreground line-clamp-1">
-                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "—"}</span> • Mentees: {dev.attendeeNames?.join(", ") || "—"}
+                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "â€”"}</span> â€¢ Mentees: {dev.attendeeNames?.join(", ") || "â€”"}
                     </p>
                   </div>
                 </div>
@@ -3398,7 +3647,7 @@ const C2SAnalytics = ({
         )}
       </div>
 
-      {/* ── EXPORT CONFIRMATION MODAL (YES / NO) ── */}
+      {/* â”€â”€ EXPORT CONFIRMATION MODAL (YES / NO) â”€â”€ */}
       <AlertDialog open={showExportConfirm} onOpenChange={setShowExportConfirm}>
         <AlertDialogContent className="sm:max-w-[420px] rounded-2xl border border-border/80 shadow-2xl p-6">
           <AlertDialogHeader className="space-y-2">
@@ -3426,9 +3675,9 @@ const C2SAnalytics = ({
   );
 };
 
-// departmentClusters is now derived from DB — see departmentClusters useMemo in C2SPage
+// departmentClusters is now derived from DB â€” see departmentClusters useMemo in C2SPage
 
-// ─── MAIN CONNECT 2 SOULS PAGE COMPONENT ─────────────────────────────────
+// â”€â”€â”€ MAIN CONNECT 2 SOULS PAGE COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function C2SPageContent() {
   const { user } = useAuthStore();
   const { canManageC2S, canViewC2SAnalytics, isSuperAdmin, isMinistryHead, myMinistryIds, allRoles } = useUserRole();
@@ -3527,7 +3776,7 @@ function C2SPageContent() {
     return [];
   }, [rawDepartmentSettings]);
 
-  // Derive department → ministry list from DB with complete mapping in strict WORDA order
+  // Derive department â†’ ministry list from DB with complete mapping in strict WORDA order
   const departmentClusters = useMemo<Record<string, { value: string; label: string }[]>>(() => {
     const map: Record<string, { value: string; label: string }[]> = {
       WORSHIP: [...DEFAULT_DEPARTMENT_CLUSTERS.WORSHIP],
@@ -4895,7 +5144,7 @@ function C2SPageContent() {
   return (
     <AppLayout>
       <div className="flex flex-col space-y-6 pb-12 w-full">
-        {/* ── TOP HEADER ── */}
+        {/* â”€â”€ TOP HEADER â”€â”€ */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">
@@ -4931,7 +5180,7 @@ function C2SPageContent() {
           className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"
         >
 
-          {/* ══════════════════ TAB 0: ADMIN OVERVIEW ══════════════════ */}
+          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• TAB 0: ADMIN OVERVIEW â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
           {(isSuperAdmin || isAdminUser) && (
             <TabsContent value="overview" className="space-y-6 mt-0">
               <AdminOverview
@@ -4947,7 +5196,7 @@ function C2SPageContent() {
             </TabsContent>
           )}
 
-          {/* ══════════════════ TAB 1: DEVOTIONS ══════════════════ */}
+          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• TAB 1: DEVOTIONS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
           <TabsContent value="devotions" className="space-y-6 mt-0">
             {/* Devotions KPI Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -5074,7 +5323,7 @@ function C2SPageContent() {
                       key={record.id}
                       className="rounded-2xl border border-slate-200/90 dark:border-border/80 bg-white dark:bg-card p-5 sm:p-6 flex flex-col hover:border-sidebar/40 hover:shadow-md transition-all shadow-2xs group"
                     >
-                      {/* ── TOP HEADER BAR: DATE PILL, TIME, VIEW PHOTO BUTTON & MENU ── */}
+                      {/* â”€â”€ TOP HEADER BAR: DATE PILL, TIME, VIEW PHOTO BUTTON & MENU â”€â”€ */}
                       <div className="flex items-center justify-between gap-2 min-h-[40px] pb-1">
                         <div className="flex items-center gap-2">
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
@@ -5137,7 +5386,7 @@ function C2SPageContent() {
                         </div>
                       </div>
 
-                      {/* ── TITLE & SUBTITLE (Mentor on top, with mentee below, lesson at bottom) ── */}
+                      {/* â”€â”€ TITLE & SUBTITLE (Mentor on top, with mentee below, lesson at bottom) â”€â”€ */}
                       <div className="mt-3.5 space-y-1">
                         <h3
                           onClick={() => setViewingDevotion(record)}
@@ -5154,7 +5403,7 @@ function C2SPageContent() {
                         </div>
                       </div>
 
-                      {/* ── REFLECTION BOX (Matches Image 2 Style) ── */}
+                      {/* â”€â”€ REFLECTION BOX (Matches Image 2 Style) â”€â”€ */}
                       {record.reflectionNotes && (
                         <div className="mt-3.5 bg-slate-50/90 dark:bg-muted/25 p-4 rounded-2xl border border-slate-200/70 dark:border-border/60 space-y-1.5">
                           <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-sidebar dark:text-blue-400">
@@ -5167,7 +5416,7 @@ function C2SPageContent() {
                         </div>
                       )}
 
-                      {/* ── PRAYER REQUEST LINE ── */}
+                      {/* â”€â”€ PRAYER REQUEST LINE â”€â”€ */}
                       {record.prayerRequests && (
                         <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-border/50 flex items-start gap-2 text-xs text-muted-foreground">
                           <Heart className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
@@ -5186,7 +5435,7 @@ function C2SPageContent() {
             )}
           </TabsContent>
 
-          {/* ══════════════════ TAB 2: GROUPS & MENTEES ══════════════════ */}
+          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• TAB 2: GROUPS & MENTEES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
           <TabsContent value="mentees" className="space-y-6 mt-0">
             {/* Stat Cards for Mentees */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -5228,7 +5477,7 @@ function C2SPageContent() {
               />
             </div>
             {isMentorUser ? (
-              /* ── MENTOR VIEW: DIRECT MENTEES TABLE (Room Reservations Admin Table Style) ── */
+              /* â”€â”€ MENTOR VIEW: DIRECT MENTEES TABLE (Room Reservations Admin Table Style) â”€â”€ */
               <div className="bg-card rounded-2xl border border-border/60 shadow-card-dark p-5 sm:p-6 overflow-hidden flex flex-col min-h-[480px]">
                 {/* Controls Row */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
@@ -5306,7 +5555,7 @@ function C2SPageContent() {
                     </div>
                   ) : (
                     <div className="flex-grow flex flex-col">
-                      {/* ── Mobile card view ── */}
+                      {/* â”€â”€ Mobile card view â”€â”€ */}
                       <div className="md:hidden p-3 space-y-3 bg-muted/15 dark:bg-muted/10">
                         {filteredMyMentees.map((m) => {
                           const fullName = `${m.firstName} ${m.lastName}`.trim();
@@ -5318,7 +5567,7 @@ function C2SPageContent() {
                             .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
                           const lastSessionDate = menteeDevotions[0]?.devotionDate
                             ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd")
-                            : "—";
+                            : "â€”";
                           const progressPct =
                             m.status === "Completed" ? 100 :
                               menteeDevotions.length > 0 ? Math.min(100, Math.round((menteeDevotions.length / 24) * 100)) : 0;
@@ -5447,7 +5696,7 @@ function C2SPageContent() {
                         })}
                       </div>
 
-                      {/* ── Desktop table view ── */}
+                      {/* â”€â”€ Desktop table view â”€â”€ */}
                       <div className="hidden md:block overflow-x-auto flex-grow">
                         <Table>
                           <TableHeader>
@@ -5484,7 +5733,7 @@ function C2SPageContent() {
                                 .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
                               const lastSessionDate = menteeDevotions[0]?.devotionDate
                                 ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd")
-                                : "—";
+                                : "â€”";
 
                               const progressPct =
                                 m.status === "Completed"
@@ -5599,7 +5848,7 @@ function C2SPageContent() {
                 </div>
               </div>
             ) : (
-              /* ── MINISTRY HEAD / ADMIN VIEW: INDIVIDUAL MENTEES TABLE (Room Reservations Admin Table Style) ── */
+              /* â”€â”€ MINISTRY HEAD / ADMIN VIEW: INDIVIDUAL MENTEES TABLE (Room Reservations Admin Table Style) â”€â”€ */
               <div className="bg-card rounded-2xl border border-border/60 shadow-card-dark p-4 sm:p-6 overflow-hidden flex flex-col min-h-[480px]">
                 {/* Controls Row: Stacked cleanly on mobile, single row on desktop */}
                 <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 pb-1">
@@ -5764,7 +6013,7 @@ function C2SPageContent() {
                     </div>
                   ) : (
                     <div className="flex-grow flex flex-col">
-                      {/* ── Mobile card view ── */}
+                      {/* â”€â”€ Mobile card view â”€â”€ */}
                       <div className="md:hidden p-3 space-y-3 bg-muted/15 dark:bg-muted/10">
                         {filteredHeadMentees.map((m) => {
                           const fullName = `${m.firstName} ${m.lastName}`.trim();
@@ -5792,7 +6041,7 @@ function C2SPageContent() {
                             .filter((d: any) => d.attendeeNames?.some((name: string) => name.toLowerCase().includes(fullName.toLowerCase())))
                             .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
                           const progressPct = m.status === "Completed" ? 100 : menteeDevotions.length > 0 ? Math.min(100, Math.round((menteeDevotions.length / 24) * 100)) : 0;
-                          const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "—";
+                          const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "â€”";
                           const isMenteeActive = (m.status || "Active").toLowerCase() === "active";
                           const displayStatus = isMenteeActive ? "Active" : "Inactive";
                           const statusColorClass = isMenteeActive
@@ -5929,7 +6178,7 @@ function C2SPageContent() {
                         })}
                       </div>
 
-                      {/* ── Desktop table view ── */}
+                      {/* â”€â”€ Desktop table view â”€â”€ */}
                       <div className="hidden md:block overflow-x-auto">
                         <Table className="w-full">
                           <TableHeader>
@@ -5971,7 +6220,7 @@ function C2SPageContent() {
                               const menteeDevotions = (allDevotions || [])
                                 .filter((d: any) => d.attendeeNames?.some((name: string) => name.toLowerCase().includes(fullName.toLowerCase())))
                                 .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
-                              const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "—";
+                              const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "â€”";
                               const progressPct = m.status === "Completed" ? 100 : menteeDevotions.length > 0 ? Math.min(100, Math.round((menteeDevotions.length / 24) * 100)) : 0;
                               const isMenteeActive = (m.status || "Active").toLowerCase() === "active";
                               const displayStatus = isMenteeActive ? "Active" : "Inactive";
@@ -6052,7 +6301,7 @@ function C2SPageContent() {
             )}
           </TabsContent>
 
-          {/* ══════════════════ TAB 3: ANALYTICS ══════════════════ */}
+          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• TAB 3: ANALYTICS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
           {isHeadOrAdmin && (
             <TabsContent value="analytics" className="mt-0">
               <C2SAnalytics
@@ -6073,10 +6322,10 @@ function C2SPageContent() {
         </Tabs>
       </div>
 
-      {/* ── Submit / Edit Devotion Record Sheet ── */}
+      {/* â”€â”€ Submit / Edit Devotion Record Sheet â”€â”€ */}
       <Sheet open={isDevotionSheetOpen} onOpenChange={setIsDevotionSheetOpen}>
         <SheetContent className="sm:max-w-2xl h-[92dvh] sm:h-[90vh] max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-3xl border-border/80 shadow-2xl gap-0 bg-background [&>button:last-child]:hidden">
-          {/* ── MODAL HEADER (Matches Admin Form Style) ── */}
+          {/* â”€â”€ MODAL HEADER (Matches Admin Form Style) â”€â”€ */}
           <div className="p-5 pb-4 border-b border-border/70 bg-card/80 backdrop-blur-md shrink-0 sticky top-0 z-10">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3.5 min-w-0 flex-1">
@@ -6127,7 +6376,7 @@ function C2SPageContent() {
         </SheetContent>
       </Sheet>
 
-      {/* ── View Devotion Details Lightbox Dialog ── */}
+      {/* â”€â”€ View Devotion Details Lightbox Dialog â”€â”€ */}
       <DevotionDetailsModal
         devotion={viewingDevotion}
         isOpen={!!viewingDevotion}
@@ -6135,7 +6384,7 @@ function C2SPageContent() {
         isSuperAdmin={isSuperAdmin}
       />
 
-      {/* ── Mentee Detail Sheet (Mobile View Details) ── */}
+      {/* â”€â”€ Mentee Detail Sheet (Mobile View Details) â”€â”€ */}
       <Sheet open={!!viewingMenteeDetail} onOpenChange={(open) => { if (!open) setViewingMenteeDetail(null); }}>
         <SheetContent className="p-0 overflow-y-auto rounded-2xl gap-0 border-border/80 shadow-2xl [&>button]:hidden">
           {viewingMenteeDetail && (() => {
@@ -6160,7 +6409,7 @@ function C2SPageContent() {
                 ? `${workerProfile.firstName?.[0] || ""}${workerProfile.lastName?.[0] || ""}`.toUpperCase()
                 : "UA";
             const menteeMinistry = md.menteeMinistry || getMenteeMinistry(md);
-            const menteeDepartment = getMenteeDepartment ? getMenteeDepartment(md) : "—";
+            const menteeDepartment = getMenteeDepartment ? getMenteeDepartment(md) : "â€”";
             const menteeDevotions = (allDevotions || [])
               .filter((d: any) => d.attendeeNames?.some((name: string) => name.toLowerCase().includes(md.fullName?.toLowerCase())))
               .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
@@ -6175,7 +6424,7 @@ function C2SPageContent() {
               ? md.lastSessionDate
               : menteeDevotions[0]?.devotionDate
                 ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd")
-                : "—";
+                : "â€”";
             const isMenteeActive = (md.status || "Active").toLowerCase() === "active";
             const displayStatus = isMenteeActive ? "Active" : "Inactive";
             const statusColorClass = isMenteeActive ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-slate-500/15 text-slate-700 dark:text-slate-300";
@@ -6226,7 +6475,7 @@ function C2SPageContent() {
                   ].map(({ label, value }) => (
                     <div key={label} className="p-3.5 rounded-xl border border-border/60 bg-card/60">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{label}</p>
-                      <p className="text-sm font-semibold text-foreground">{value || "—"}</p>
+                      <p className="text-sm font-semibold text-foreground">{value || "â€”"}</p>
                     </div>
                   ))}
 
@@ -6294,7 +6543,7 @@ function C2SPageContent() {
         </SheetContent>
       </Sheet>
 
-      {/* ── Mentee Sheet ── */}
+      {/* â”€â”€ Mentee Sheet â”€â”€ */}
       <Sheet open={isMenteeSheetOpen} onOpenChange={setIsMenteeSheetOpen}>
         <SheetContent className="sm:max-w-lg p-0 flex flex-col h-full max-h-[100dvh] sm:max-h-[88vh] rounded-2xl gap-0 border-border/80 shadow-2xl overflow-hidden [&>button:last-child]:hidden">
           {/* Header */}
@@ -6359,7 +6608,7 @@ function C2SPageContent() {
         </SheetContent>
       </Sheet>
 
-      {/* ── Delete Confirmation Dialog ── */}
+      {/* â”€â”€ Delete Confirmation Dialog â”€â”€ */}
       <DeleteConfirmationDialog
         isOpen={!!itemToDelete}
         isLoading={deleteMenteeMutation.isPending || deleteDevotionMutation.isPending || deleteGroupMutation.isPending}

@@ -275,8 +275,11 @@ export async function getRoles() {
         },
         orderBy: { name: 'asc' },
     });
-    setCached(cacheKey, roles, 60_000);
-    return roles;
+    const cleaned = roles
+        .filter(r => r.name?.trim().toLowerCase() !== 'new role')
+        .map(r => r.name?.trim().toLowerCase() === 'super admin' ? { ...r, name: 'Admin' } : r);
+    setCached(cacheKey, cleaned, 60_000);
+    return cleaned;
 }
 
 export async function getRoleById(id: string) {

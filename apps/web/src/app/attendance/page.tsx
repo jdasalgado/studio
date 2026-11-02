@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useMemo, useState, useCallback, Suspense } from "react";
 import Image from "next/image";
@@ -42,7 +42,7 @@ import { regenerateWorkerQrToken } from "@/actions/db";
 import { exportToExcel } from "@/lib/export-excel";
 import { ExportConfirmDialog } from "@/components/common/export-confirm-dialog";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 function generateToken() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -60,9 +60,10 @@ function WorkerInitials({ name }: { name: string }) {
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const lower = role.toLowerCase();
+  const displayRole = role.toLowerCase() === "super admin" ? "Admin" : role;
+  const lower = displayRole.toLowerCase();
   if (lower.includes("admin"))
-    return <span className="inline-flex px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300 border border-orange-200 dark:border-orange-800 whitespace-nowrap">{role}</span>;
+    return <span className="inline-flex px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300 border border-orange-200 dark:border-orange-800 whitespace-nowrap">{displayRole}</span>;
   if (lower.includes("head") || lower.includes("pastor") || lower.includes("ministry"))
     return <span className="inline-flex px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800 whitespace-nowrap">{role}</span>;
   return <span className="inline-flex px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-muted dark:text-slate-300 border border-slate-200 dark:border-border whitespace-nowrap">{role}</span>;
@@ -118,7 +119,7 @@ function pairSessions(records: any[]) {
 }
 
 function formatHours(mins: number | null) {
-  if (mins === null) return "—";
+  if (mins === null) return "--";
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60), m = mins % 60;
   return m > 0 ? `${h}.${Math.round((m / 60) * 10)}h` : `${h}h`;
@@ -136,7 +137,7 @@ function AttendanceStatusBadge({ status }: { status: "timed-in" | "timed-out" | 
   return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Not Yet Timed In</span>;
 }
 
-// ── Main Content ──────────────────────────────────────────────────────────────
+// Main Content
 function AttendanceContent() {
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
@@ -181,7 +182,19 @@ function AttendanceContent() {
     const { worker, type } = attendanceConfirm;
     setIsSubmittingAttendance(true);
     try {
-      await createAttendanceRecord({ workerProfileId: worker.id, type });
+      let actionError = null as string | null;
+      try {
+        await createAttendanceRecord({ workerProfileId: worker.id, type });
+      } catch (serverErr: any) {
+        let msg: string = serverErr?.message || serverErr?.digest || "Failed to record attendance";
+        if (typeof msg === "string" && msg.startsWith("Error: ")) msg = msg.slice(7).trim();
+        actionError = msg;
+      }
+      if (actionError) {
+        toast({ title: "Error", description: actionError, variant: "destructive" });
+        setIsSubmittingAttendance(false);
+        return;
+      }
       if (type === "Clock In") {
         const hasStub = assignedStubs?.some((s: any) => {
           const sd = s.date instanceof Date ? s.date : new Date(s.date);
@@ -314,9 +327,9 @@ function AttendanceContent() {
           `${w.firstName} ${w.lastName}`,
           fmtId(w.workerId),
           getRoleName(w),
-          ministries.find((m) => m.id === w.majorMinistryId)?.name || "—",
+          ministries.find((m) => m.id === w.majorMinistryId)?.name || "--",
           statusLabel,
-          ws?.lastType === "time-in" ? "Time In" : ws?.lastType === "time-out" ? "Time Out" : (ws?.lastType ? ws.lastType.charAt(0).toUpperCase() + ws.lastType.slice(1) : "—"),
+          ws?.lastType === "time-in" ? "Time In" : ws?.lastType === "time-out" ? "Time Out" : (ws?.lastType ? ws.lastType.charAt(0).toUpperCase() + ws.lastType.slice(1) : "--"),
         ];
       });
 
@@ -387,12 +400,12 @@ function AttendanceContent() {
       const rows = filteredRecordRows.map((r) => [
         `${r.worker.firstName} ${r.worker.lastName}`,
         fmtId(r.worker.workerId),
-        ministries.find((m) => m.id === r.worker.majorMinistryId)?.name || "—",
+        ministries.find((m) => m.id === r.worker.majorMinistryId)?.name || "--",
         format(r.date, "yyyy-MM-dd"),
-        r.timeIn ? format(r.timeIn, "h:mm a") : "—",
-        r.timeOut ? format(r.timeOut, "h:mm a") : "—",
-        r.hours != null ? `${Math.floor(r.hours / 60)}h ${r.hours % 60}m` : "—",
-        r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : "—",
+        r.timeIn ? format(r.timeIn, "h:mm a") : "--",
+        r.timeOut ? format(r.timeOut, "h:mm a") : "--",
+        r.hours != null ? `${Math.floor(r.hours / 60)}h ${r.hours % 60}m` : "--",
+        r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : "--",
       ]);
 
       exportToExcel(`attendance_records_${format(new Date(), "yyyyMMdd")}.xlsx`, [
@@ -500,15 +513,18 @@ function AttendanceContent() {
   }, [todayAttendance]);
 
   const fmtId = (id: string | null | undefined) => {
-    if (!id) return "—";
+    if (!id) return "--";
     const clean = String(id).replace(/^COG-?/i, "").trim();
     const n = parseInt(clean, 10);
     return isNaN(n) ? id : String(n).padStart(6, "0");
   };
 
   const getRoleName = (w: any) => {
-    if (w.roles?.length > 0) return w.roles[0]?.role?.name || w.roles[0]?.roleId || "Worker";
-    return (roles as any[]).find(r => r.id === w.roleId)?.name || "Worker";
+    let name = "Worker";
+    if (w.roles?.length > 0) name = w.roles[0]?.role?.name || w.roles[0]?.roleId || "Worker";
+    else name = (roles as any[]).find(r => r.id === w.roleId)?.name || "Worker";
+    if (name.toLowerCase() === "super admin") return "Admin";
+    return name;
   };
 
   // For Ministry Head, restrict visible workers strictly to those with the "Worker" role
@@ -649,7 +665,7 @@ function AttendanceContent() {
                 ? "Manually record and manage time-ins and time-outs for workers."
                 : activeTab === "records"
                 ? "Comprehensive attendance history, exportable logs, and filtering."
-                : "Scan, monitor, and manage attendance across every ministry — in one workforce command center."}
+                : "Scan, monitor, and manage attendance across every ministry -- in one workforce command center."}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
@@ -672,7 +688,7 @@ function AttendanceContent() {
         </div>
 
         <div className="space-y-7 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* ── Personal Log ── */}
+          {/* Personal Log */}
           {activeTab === "personal" && (
             <div className="flex flex-col gap-6 w-full">
               {/* Stat Cards */}
@@ -707,7 +723,7 @@ function AttendanceContent() {
                 {/* Inner Table Container */}
                 <div className="bg-card rounded-2xl border border-border/60 overflow-hidden flex flex-col">
 
-                  {/* Mobile card view (Enhanced layout matching card style with Navy Header & 2x2 Grid) */}
+                  {/* Mobile card view */}
                   <div className="md:hidden p-3.5 space-y-3 bg-slate-50/50 dark:bg-muted/10">
                     {sessions.length === 0 ? (
                       <div className="py-14 text-center text-xs font-medium text-muted-foreground bg-white dark:bg-card rounded-2xl border border-border/40">No records this week.</div>
@@ -781,7 +797,7 @@ function AttendanceContent() {
                                 Time Out
                               </p>
                               <p className="font-semibold text-foreground">
-                                {s.timeOut ? format(s.timeOut, "h:mm a") : "—"}
+                                {s.timeOut ? format(s.timeOut, "h:mm a") : "--"}
                               </p>
                             </div>
 
@@ -830,7 +846,7 @@ function AttendanceContent() {
                             <tr key={i} className="border-b border-gray-100 dark:border-border/60 hover:bg-gray-50/60 dark:hover:bg-muted/30 transition-colors">
                               <td className="py-4 px-6 font-bold text-xs text-foreground whitespace-nowrap align-middle">{format(s.date, "EEE, MMM d, yyyy")}</td>
                               <td className="py-4 px-6 text-xs text-muted-foreground font-medium whitespace-nowrap align-middle">{format(s.timeIn, "h:mm a")}</td>
-                              <td className="py-4 px-6 text-xs text-muted-foreground font-medium whitespace-nowrap align-middle">{s.timeOut ? format(s.timeOut, "h:mm a") : "—"}</td>
+                              <td className="py-4 px-6 text-xs text-muted-foreground font-medium whitespace-nowrap align-middle">{s.timeOut ? format(s.timeOut, "h:mm a") : "--"}</td>
                               <td className="py-4 px-6 text-xs text-muted-foreground font-medium whitespace-nowrap align-middle">{formatHours(s.totalMinutes)}</td>
                               <td className="py-4 px-6 text-center align-middle whitespace-nowrap"><StatusPill isLate={s.isLate} hasOut={s.timeOut !== null} /></td>
                             </tr>
@@ -844,7 +860,7 @@ function AttendanceContent() {
             </div>
           )}
 
-          {/* ── Manual Attendance ── */}
+          {/* Manual Attendance */}
           {activeTab === "manual" && isAssigner && (
             <div className="bg-white dark:bg-card rounded-2xl border border-border/60 shadow-card-dark p-5 sm:p-6 overflow-hidden flex flex-col gap-4">
               {/* Top Controls Row */}
@@ -922,7 +938,7 @@ function AttendanceContent() {
               {/* Table */}
               <div className="border border-border/60 rounded-2xl overflow-hidden flex flex-col bg-card">
 
-                {/* ── Mobile card view ── */}
+                {/* Mobile card view */}
                 <div className="md:hidden p-3 sm:p-4 space-y-3 flex-grow bg-slate-50/50 dark:bg-muted/10">
                   {filteredWorkers.length === 0 ? (
                     <div className="py-14 text-center text-xs font-medium text-muted-foreground bg-white dark:bg-card rounded-2xl border border-border/60">
@@ -999,7 +1015,7 @@ function AttendanceContent() {
                                   Worker ID
                                 </p>
                                 <p className="font-mono text-xs text-muted-foreground truncate">
-                                  {w.workerId ? String(w.workerId).replace(/^COG-?/i, "").padStart(6, "0") : "——"}
+                                  {w.workerId ? String(w.workerId).replace(/^COG-?/i, "").padStart(6, "0") : "--"}
                                 </p>
                               </div>
                               <div>
@@ -1007,7 +1023,7 @@ function AttendanceContent() {
                                   Time In
                                 </p>
                                 <p className="font-semibold text-foreground truncate">
-                                  {timeInStr || "——"}
+                                  {timeInStr || "--"}
                                 </p>
                               </div>
                               <div>
@@ -1015,7 +1031,7 @@ function AttendanceContent() {
                                   Time Out
                                 </p>
                                 <p className="font-semibold text-foreground truncate">
-                                  {timeOutStr || "——"}
+                                  {timeOutStr || "--"}
                                 </p>
                               </div>
                             </div>
@@ -1024,21 +1040,25 @@ function AttendanceContent() {
                             <div className="grid grid-cols-2 gap-2 pt-1">
                               <button
                                 type="button"
+                                disabled={Boolean(ws?.timeIn)}
                                 onClick={() => setAttendanceConfirm({ worker: w, type: "Clock In", status: ws })}
-                                className="h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                                className={cn(
+                                  "h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer",
+                                  Boolean(ws?.timeIn) && "opacity-40 cursor-not-allowed pointer-events-none bg-slate-200 dark:bg-muted text-muted-foreground hover:bg-slate-200"
+                                )}
                               >
-                                <LogIn className="h-3.5 w-3.5" /> Time In
+                                <LogIn className="h-3.5 w-3.5" /> {Boolean(ws?.timeIn) ? "Timed In" : "Time In"}
                               </button>
                               <button
                                 type="button"
-                                disabled={!timeInStr}
+                                disabled={!ws?.timeIn || Boolean(ws?.timeOut)}
                                 onClick={() => setAttendanceConfirm({ worker: w, type: "Clock Out", status: ws })}
                                 className={cn(
                                   "h-9 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer",
-                                  !timeInStr && "opacity-40 cursor-not-allowed pointer-events-none"
+                                  (!ws?.timeIn || Boolean(ws?.timeOut)) && "opacity-40 cursor-not-allowed pointer-events-none"
                                 )}
                               >
-                                <LogOut className="h-3.5 w-3.5" /> Time Out
+                                <LogOut className="h-3.5 w-3.5" /> {Boolean(ws?.timeOut) ? "Timed Out" : "Time Out"}
                               </button>
                             </div>
                           </div>
@@ -1048,13 +1068,13 @@ function AttendanceContent() {
                   )}
                 </div>
 
-                {/* ── Desktop table view ── */}
+                {/* Desktop table view */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-sidebar">
                       <tr className="bg-sidebar hover:bg-sidebar border-b border-sidebar-border/40">
                         {["Worker", "Worker ID", "Role", "Ministry", "Current Status", "Last Activity", "Actions"].map(h => (
-                          <th key={h} className={cn("px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap", h === "Actions" ? "text-center w-20" : "text-left")}>{h}</th>
+                          <th key={h} className={cn("px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap", "text-left")}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1080,10 +1100,20 @@ function AttendanceContent() {
                             <td className="px-4 py-3.5 align-middle whitespace-nowrap">
                               <RoleBadge role={roleName} />
                             </td>
-                            <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{ministry?.name || "—"}</td>
+                            <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{ministry?.name || "--"}</td>
                             <td className="px-4 py-3.5 align-middle whitespace-nowrap"><AttendanceStatusBadge status={currentStatus} /></td>
                             <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">
-                              {lastTime ? `${lastType === "Clock In" ? "In" : "Out"} · ${lastTime}` : "——"}
+                              {lastTime ? (
+                                <span className="inline-flex items-center gap-1.5 font-medium">
+                                  <span className={lastType === "Clock In" ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-blue-600 dark:text-blue-400 font-semibold"}>
+                                    {lastType === "Clock In" ? "In" : "Out"}
+                                  </span>
+                                  <span className="text-muted-foreground/40 font-bold">&bull;</span>
+                                  <span className="text-foreground font-medium">{lastTime}</span>
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground/50 font-mono">--</span>
+                              )}
                             </td>
                             <td className="px-4 py-3.5 align-middle whitespace-nowrap text-center">
                               <div className="flex items-center justify-center">
@@ -1097,18 +1127,27 @@ function AttendanceContent() {
                                     </button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-lg border border-border bg-popover">
-                                    <DropdownMenuItem
-                                      onClick={() => setAttendanceConfirm({ worker: w, type: "Clock In", status: ws })}
-                                      className="cursor-pointer text-xs font-medium"
-                                    >
-                                      <LogIn className="h-3.5 w-3.5 mr-2" /> Time In
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => setAttendanceConfirm({ worker: w, type: "Clock Out", status: ws })}
-                                      className="cursor-pointer text-xs font-medium"
-                                    >
-                                      <LogOut className="h-3.5 w-3.5 mr-2" /> Time Out
-                                    </DropdownMenuItem>
+                                    {!ws?.timeIn && (
+                                      <DropdownMenuItem
+                                        onClick={() => setAttendanceConfirm({ worker: w, type: "Clock In", status: ws })}
+                                        className="cursor-pointer text-xs font-medium text-emerald-600 dark:text-emerald-400 focus:text-emerald-700"
+                                      >
+                                        <LogIn className="h-3.5 w-3.5 mr-2" /> Time In
+                                      </DropdownMenuItem>
+                                    )}
+                                    {Boolean(ws?.timeIn) && !ws?.timeOut && (
+                                      <DropdownMenuItem
+                                        onClick={() => setAttendanceConfirm({ worker: w, type: "Clock Out", status: ws })}
+                                        className="cursor-pointer text-xs font-medium text-blue-600 dark:text-blue-400 focus:text-blue-700"
+                                      >
+                                        <LogOut className="h-3.5 w-3.5 mr-2" /> Time Out
+                                      </DropdownMenuItem>
+                                    )}
+                                    {Boolean(ws?.timeIn) && Boolean(ws?.timeOut) && (
+                                      <div className="px-3 py-2 text-[11px] text-muted-foreground font-medium text-center select-none">
+                                        Shift Completed
+                                      </div>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
@@ -1123,7 +1162,7 @@ function AttendanceContent() {
             </div>
           )}
 
-          {/* ── Attendance Records ── */}
+          {/* Attendance Records */}
           {activeTab === "records" && isAssigner && (
             <div className="flex flex-col gap-6">
               {/* Stat Cards with top accent stripes (matching Workers page) */}
@@ -1223,9 +1262,16 @@ function AttendanceContent() {
                         </SelectTrigger>
                         <SelectContent className="rounded-2xl border border-border shadow-lg bg-popover max-h-72">
                           <SelectItem value="all" className="text-xs font-medium cursor-pointer">All Roles</SelectItem>
-                          {(roles as any[]).map(r => (
-                            <SelectItem key={r.id} value={r.name} className="text-xs font-medium cursor-pointer">{r.name}</SelectItem>
-                          ))}
+                          {(roles as any[])
+                            .filter(r => r.name?.trim().toLowerCase() !== "new role")
+                            .map(r => {
+                              const displayName = r.name.toLowerCase() === "super admin" ? "Admin" : r.name;
+                              return (
+                                <SelectItem key={r.id} value={r.name} className="text-xs font-medium cursor-pointer">
+                                  {displayName}
+                                </SelectItem>
+                              );
+                            })}
                         </SelectContent>
                       </Select>
                     )}
@@ -1269,7 +1315,7 @@ function AttendanceContent() {
                 {/* Table Container */}
                 <div className="border border-border/60 rounded-2xl overflow-hidden flex flex-col bg-card">
 
-                  {/* ── Mobile card view (Enhanced to match reference design) ── */}
+                  {/* Mobile card view */}
                   <div className="md:hidden p-3.5 sm:p-4 space-y-3 bg-muted/20">
                     {recordsLoading ? (
                       <div className="py-12 text-center"><LoaderCircle className="mx-auto h-6 w-6 animate-spin text-sidebar" /></div>
@@ -1286,7 +1332,7 @@ function AttendanceContent() {
                       const dateStr = format(row.date, "MMM d, yyyy");
                       const timeInStr = row.timeIn ? format(row.timeIn, "h:mm a") : "";
                       const timeOutStr = row.timeOut ? format(row.timeOut, "h:mm a") : "";
-                      const workerIdFmt = row.worker.workerId ? String(row.worker.workerId).replace(/^COG-?/i, "").padStart(6, "0") : "——";
+                      const workerIdFmt = row.worker.workerId ? String(row.worker.workerId).replace(/^COG-?/i, "").padStart(6, "0") : "--";
 
                       return (
                         <div
@@ -1362,7 +1408,7 @@ function AttendanceContent() {
                                   Time In
                                 </p>
                                 <p className="font-semibold text-foreground truncate">
-                                  {timeInStr || "——"}
+                                  {timeInStr || "--"}
                                 </p>
                               </div>
                               <div>
@@ -1370,7 +1416,7 @@ function AttendanceContent() {
                                   Time Out
                                 </p>
                                 <p className="font-semibold text-foreground truncate">
-                                  {timeOutStr || "——"}
+                                  {timeOutStr || "--"}
                                 </p>
                               </div>
                             </div>
@@ -1402,21 +1448,21 @@ function AttendanceContent() {
                     })}
                   </div>
 
-                  {/* ── Desktop table view ── */}
+                  {/* Desktop table view */}
                   <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-sidebar">
                         <tr className="bg-sidebar hover:bg-sidebar border-b border-sidebar-border/40">
-                          {["Worker", "Worker ID", "Role", "Ministry", "Date", "Time In", "Time Out", "Hours", "Status", "Actions"].map(h => (
-                            <th key={h} className={cn("px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap", h === "Actions" ? "text-center w-20" : "text-left")}>{h}</th>
+                          {["Worker", "Worker ID", "Role", "Ministry", "Date", "Time In", "Time Out", "Hours", "Status"].map(h => (
+                            <th key={h} className={cn("px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap", "text-left")}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {recordsLoading ? (
-                          <tr><td colSpan={10} className="py-12 text-center"><LoaderCircle className="mx-auto h-6 w-6 animate-spin text-sidebar" /></td></tr>
+                          <tr><td colSpan={9} className="py-12 text-center"><LoaderCircle className="mx-auto h-6 w-6 animate-spin text-sidebar" /></td></tr>
                         ) : filteredRecordRows.length === 0 ? (
-                          <tr><td colSpan={10} className="py-14 text-center text-xs font-medium text-muted-foreground">No records found.</td></tr>
+                          <tr><td colSpan={9} className="py-14 text-center text-xs font-medium text-muted-foreground">No records found.</td></tr>
                         ) : filteredRecordRows.map((row, i) => {
                           const ministry = (ministries as any[]).find(m => m.id === row.worker.majorMinistryId);
                           return (
@@ -1431,41 +1477,16 @@ function AttendanceContent() {
                               <td className="px-4 py-3.5 align-middle whitespace-nowrap">
                                 <RoleBadge role={getRoleName(row.worker)} />
                               </td>
-                              <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{ministry?.name || "—"}</td>
+                              <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{ministry?.name || "--"}</td>
                               <td className="px-4 py-3.5 text-xs font-semibold text-foreground align-middle whitespace-nowrap">{format(row.date, "EEE, MMM d, yyyy")}</td>
-                              <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{row.timeIn ? format(row.timeIn, "h:mm a") : "——"}</td>
-                              <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{row.timeOut ? format(row.timeOut, "h:mm a") : "——"}</td>
+                              <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{row.timeIn ? format(row.timeIn, "h:mm a") : "--"}</td>
+                              <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{row.timeOut ? format(row.timeOut, "h:mm a") : "--"}</td>
                               <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium align-middle whitespace-nowrap">{formatHours(row.hours)}</td>
                               <td className="px-4 py-3.5 align-middle whitespace-nowrap">
                                 {row.status === "present" && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Present</span>}
                                 {row.status === "late" && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Late</span>}
                                 {row.status === "absent" && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-800"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Absent</span>}
                                 {row.status === "incomplete" && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Incomplete</span>}
-                              </td>
-                              <td className="px-4 py-3.5 align-middle whitespace-nowrap text-center">
-                                <div className="flex items-center justify-center">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button type="button" className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-lg border border-border bg-popover">
-                                      <DropdownMenuItem
-                                        onClick={() => setAttendanceConfirm({ worker: row.worker, type: "Clock In" })}
-                                        className="cursor-pointer text-xs font-medium"
-                                      >
-                                        <LogIn className="h-3.5 w-3.5 mr-2" /> Time In
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={() => setAttendanceConfirm({ worker: row.worker, type: "Clock Out" })}
-                                        className="cursor-pointer text-xs font-medium"
-                                      >
-                                        <LogOut className="h-3.5 w-3.5 mr-2" /> Time Out
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
                               </td>
                             </tr>
                           );
@@ -1578,13 +1599,15 @@ function AttendanceContent() {
               const ws = attendanceConfirm ? (attendanceConfirm.status || workerStatusMap[attendanceConfirm.worker?.id]) : null;
               const hasTimeIn = Boolean(ws?.timeIn);
               const isTimeOutBlocked = attendanceConfirm?.type === "Clock Out" && !hasTimeIn;
+              const isTimeInBlocked = attendanceConfirm?.type === "Clock In" && hasTimeIn;
+              const isBlocked = isTimeOutBlocked || isTimeInBlocked;
 
               return (
                 <AlertDialogAction
-                  disabled={isSubmittingAttendance || isTimeOutBlocked}
+                  disabled={isSubmittingAttendance || isBlocked}
                   onClick={(e) => {
                     e.preventDefault();
-                    if (!isTimeOutBlocked) {
+                    if (!isBlocked) {
                       handleConfirmAttendance();
                     }
                   }}
@@ -1593,7 +1616,7 @@ function AttendanceContent() {
                     attendanceConfirm?.type === "Clock In"
                       ? "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                       : "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500",
-                    isTimeOutBlocked && "opacity-40 cursor-not-allowed pointer-events-none"
+                    isBlocked && "opacity-40 cursor-not-allowed pointer-events-none"
                   )}
                 >
                   {isSubmittingAttendance ? (
@@ -1673,7 +1696,7 @@ function AttendanceContent() {
                       Time Out
                     </span>
                     <span className="font-bold text-foreground text-sm block">
-                      {selectedSession.timeOut ? format(selectedSession.timeOut, "h:mm a") : "—"}
+                      {selectedSession.timeOut ? format(selectedSession.timeOut, "h:mm a") : "--"}
                     </span>
                     {!selectedSession.timeOut && (
                       <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium block">

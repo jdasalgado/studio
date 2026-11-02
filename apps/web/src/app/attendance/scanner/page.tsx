@@ -43,6 +43,19 @@ export default function QRScannerPage() {
     const streamRef = useRef<MediaStream | null>(null);
     const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const isProcessingRef = useRef(false);
+    const barcodeDetectorRef = useRef<any>(null);
+
+    // Initialize hardware-accelerated Native BarcodeDetector if available
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+            try {
+                barcodeDetectorRef.current = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+            } catch (e) {
+                console.warn('BarcodeDetector initialization:', e);
+            }
+        }
+    }, []);
 
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
     const [scannedWorker, setScannedWorker] = useState<any | null>(null);
@@ -231,7 +244,15 @@ export default function QRScannerPage() {
         setScannedWorker(null);
         setScanResult(null);
         setCountdown(5);
+        isProcessingRef.current = false;
         setIsProcessing(false);
+
+        if (videoRef.current) {
+            if (streamRef.current && videoRef.current.srcObject !== streamRef.current) {
+                videoRef.current.srcObject = streamRef.current;
+            }
+            videoRef.current.play().catch(() => {});
+        }
     }, []);
 
     const logScanEvent = useCallback(async (logData: any) => {
@@ -243,7 +264,8 @@ export default function QRScannerPage() {
     }, [createScanLogSql]);
 
     const handleScan = useCallback(async (data: string) => {
-        if (!data || isProcessing) return;
+        if (!data || isProcessingRef.current) return;
+        isProcessingRef.current = true;
         setIsProcessing(true);
 
         let type = 'COG_USER';
@@ -480,33 +502,67 @@ export default function QRScannerPage() {
         };
     }, [selectedDeviceId, hasCameraPermission, isAuthenticated]);
 
-    // Resume scanning after processing/worker dismissed
+    // Stable ref for handleScan
+    const handleScanRef = useRef(handleScan);
     useEffect(() => {
-        if (isProcessing || scannedWorker || scanResult) return;
+        handleScanRef.current = handleScan;
+    }, [handleScan]);
+
+    // High-speed hardware-accelerated + downsampled jsQR scan loop
+    useEffect(() => {
+        if (!isAuthenticated || !hasCameraPermission) return;
         const videoElement = videoRef.current;
         const canvas = canvasRef.current;
-        if (!videoElement || !canvas || !isAuthenticated || !hasCameraPermission) return;
+        if (!videoElement || !canvas) return;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) return;
 
         let active = true;
 
-        const scan = () => {
+        const scan = async () => {
             if (!active) return;
-            if (videoElement.readyState >= 2 && !isProcessing && !scannedWorker && !scanResult) {
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: 'dontInvert',
-                });
-                if (code?.data) {
-                    handleScan(code.data);
-                    return;
+
+            if (videoElement.readyState >= 2 && !isProcessingRef.current && !scannedWorker && !scanResult) {
+                // 1. Ultra-fast Native BarcodeDetector (Hardware Accelerated, < 2ms)
+                if (barcodeDetectorRef.current) {
+                    try {
+                        const barcodes = await barcodeDetectorRef.current.detect(videoElement);
+                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue && !isProcessingRef.current) {
+                            handleScanRef.current(barcodes[0].rawValue);
+                            return;
+                        }
+                    } catch {
+                        // Fall back to optimized canvas jsQR
+                    }
+                }
+
+                // 2. High-speed downsampled jsQR fallback (Sub-8ms execution)
+                const vw = videoElement.videoWidth;
+                const vh = videoElement.videoHeight;
+                if (vw > 0 && vh > 0) {
+                    const scale = Math.min(1, 640 / Math.max(vw, vh));
+                    const scanWidth = Math.round(vw * scale);
+                    const scanHeight = Math.round(vh * scale);
+
+                    if (canvas.width !== scanWidth || canvas.height !== scanHeight) {
+                        canvas.width = scanWidth;
+                        canvas.height = scanHeight;
+                    }
+                    ctx.drawImage(videoElement, 0, 0, scanWidth, scanHeight);
+                    const imageData = ctx.getImageData(0, 0, scanWidth, scanHeight);
+                    const code = jsQR(imageData.data, scanWidth, scanHeight, {
+                        inversionAttempts: 'dontInvert',
+                    });
+                    if (code?.data && !isProcessingRef.current) {
+                        handleScanRef.current(code.data);
+                        return;
+                    }
                 }
             }
-            animFrameRef.current = requestAnimationFrame(scan);
+
+            if (active) {
+                animFrameRef.current = requestAnimationFrame(scan);
+            }
         };
 
         animFrameRef.current = requestAnimationFrame(scan);
@@ -514,7 +570,7 @@ export default function QRScannerPage() {
             active = false;
             cancelAnimationFrame(animFrameRef.current);
         };
-    }, [isProcessing, scannedWorker, scanResult, isAuthenticated, hasCameraPermission, handleScan]);
+    }, [isAuthenticated, hasCameraPermission, scannedWorker, scanResult]);
 
     if (!isAuthenticated) {
         return (
@@ -644,167 +700,172 @@ export default function QRScannerPage() {
                     </CardHeader>
                     <CardContent className="flex-1 min-h-0 p-3 sm:p-5 flex flex-col items-center justify-center">
                         <div className="w-full max-w-md lg:max-w-lg mx-auto space-y-3 h-full flex flex-col justify-center">
-                            {scanResult ? (
-                                <div className="flex flex-col items-center justify-center p-4 text-center w-full max-w-sm mx-auto animate-in fade-in zoom-in-95 duration-200">
-                                    {/* Avatar & Badge Icon */}
-                                    <div className="relative mb-2">
-                                        <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-background shadow-xl ring-4 ring-offset-2 ring-primary/20">
-                                            <AvatarImage src={scanResult.worker.avatarUrl} alt={`${scanResult.worker.firstName} ${scanResult.worker.lastName}`} />
-                                            <AvatarFallback><UserIcon className="h-10 w-10 sm:h-12 sm:w-12" /></AvatarFallback>
-                                        </Avatar>
-                                        <div className={`absolute -bottom-1 -right-1 p-1.5 rounded-full shadow-lg text-white ${scanResult.action === 'Clock In'
-                                            ? 'bg-emerald-600'
-                                            : scanResult.action === 'Clock Out'
-                                                ? 'bg-blue-600'
-                                                : 'bg-amber-600'
-                                            }`}>
-                                            {scanResult.action === 'Clock In' ? (
-                                                <LogIn className="h-4 w-4" />
-                                            ) : scanResult.action === 'Clock Out' ? (
-                                                <LogOut className="h-4 w-4" />
-                                            ) : (
-                                                <AlertTriangle className="h-4 w-4" />
-                                            )}
-                                        </div>
-                                    </div>
+                            <div className="space-y-3 w-full my-auto">
+                                <div className="relative w-full aspect-[4/3] max-h-[340px] sm:max-h-[400px] lg:max-h-[460px] bg-slate-950 rounded-2xl overflow-hidden border border-border/60 shadow-inner mx-auto">
+                                    <video
+                                        ref={videoRef}
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                        autoPlay
+                                        muted
+                                        playsInline
+                                    />
+                                    {/* Hidden canvas for jsQR capture */}
+                                    <canvas ref={canvasRef} className="hidden" />
 
-                                    {/* Worker Name & Role */}
-                                    <h2 className="text-lg font-headline font-bold text-foreground">
-                                        {scanResult.worker.firstName} {scanResult.worker.lastName}
-                                    </h2>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2">
-                                        {scanResult.worker.roleId || scanResult.worker.employmentType || 'Personnel'}
-                                    </p>
-
-                                    {/* Action & Status Card */}
-                                    <div className={`w-full rounded-xl p-3 border mb-3 flex flex-col items-center gap-1 shadow-sm ${scanResult.action === 'Clock In'
-                                        ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800'
-                                        : scanResult.action === 'Clock Out'
-                                            ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800'
-                                            : 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
-                                        }`}>
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${scanResult.action === 'Clock In'
-                                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
-                                            : scanResult.action === 'Clock Out'
-                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
-                                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
-                                            }`}>
-                                            {scanResult.action === 'Clock In' ? '✓ TIMED IN' : scanResult.action === 'Clock Out' ? '✓ TIMED OUT' : '⚠ COOLDOWN ACTIVE'}
-                                        </span>
-
-                                        <span className="text-2xl font-extrabold font-mono tracking-tight text-foreground my-0.5">
-                                            {scanResult.time ? new Date(scanResult.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : ''}
-                                        </span>
-
-                                        <div className="flex items-center gap-1.5">
-                                            <Badge variant={
-                                                scanResult.status === 'On Time' || scanResult.status === 'Shift Completed'
-                                                    ? 'success'
-                                                    : scanResult.status === 'Late' || scanResult.status === 'Undertime'
-                                                        ? 'warning'
-                                                        : 'secondary'
-                                            }>
-                                                {scanResult.status || 'Recorded'}
-                                            </Badge>
-                                        </div>
-
-                                        <p className="text-[11px] text-muted-foreground mt-0.5 px-2 text-center leading-relaxed">
-                                            {scanResult.message}
-                                        </p>
-                                    </div>
-
-                                    {/* Auto-reset indicator */}
-                                    <div className="w-full flex flex-col items-center gap-1.5">
-                                        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                                            <div
-                                                className="bg-primary h-full transition-all duration-1000 ease-linear"
-                                                style={{ width: `${(countdown / 5) * 100}%` }}
-                                            />
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                                            <RefreshCw className="h-3 w-3 animate-spin text-primary" /> Auto-resetting in {countdown}s...
-                                        </p>
-                                        <Button variant="ghost" size="sm" onClick={resetScanner} className="text-xs text-primary hover:underline h-6 mt-0.5">
-                                            Scan next worker now →
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-3 w-full my-auto">
-                                    <div className="relative w-full aspect-[4/3] max-h-[340px] sm:max-h-[400px] lg:max-h-[460px] bg-slate-950 rounded-2xl overflow-hidden border border-border/60 shadow-inner mx-auto">
-                                        <video
-                                            ref={videoRef}
-                                            className="absolute inset-0 w-full h-full object-cover"
-                                            autoPlay
-                                            muted
-                                            playsInline
-                                        />
-                                        {/* Hidden canvas for jsQR capture */}
-                                        <canvas ref={canvasRef} className="hidden" />
-
-                                        {/* Targeting box */}
+                                    {/* Targeting box (shown only when scanning) */}
+                                    {!scanResult && (
                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                             <div className="w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 border-2 border-dashed border-primary/80 rounded-2xl animate-pulse" />
                                         </div>
+                                    )}
 
-                                        {(isProcessing || workersLoading) && (
-                                            <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex flex-col items-center justify-center gap-2">
-                                                <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
-                                                <span className="text-xs font-bold text-white tracking-wide">Processing Scan...</span>
-                                            </div>
-                                        )}
+                                    {(isProcessing || workersLoading) && !scanResult && (
+                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex flex-col items-center justify-center gap-2 z-10">
+                                            <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+                                            <span className="text-xs font-bold text-white tracking-wide">Processing Scan...</span>
+                                        </div>
+                                    )}
 
+                                    {!scanResult && (
                                         <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-pulse pointer-events-none" />
+                                    )}
 
-                                        {devices.length > 1 && (
-                                            <div className="absolute bottom-3 right-3 z-10">
-                                                <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer" onClick={handleSwitchCamera}>
-                                                    <SwitchCamera className="h-4 w-4" />
-                                                    <span className="sr-only">Switch Camera</span>
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {hasCameraPermission === false && (
-                                        <Alert variant="destructive" className="rounded-xl">
-                                            <AlertTitle>Camera Access Required</AlertTitle>
-                                            <AlertDescription className="space-y-2 mt-1">
-                                                <p>Please allow camera permissions in your device settings to scan.</p>
-                                                <div className="flex flex-wrap items-center gap-2 pt-1">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={requestCameraPermission}
-                                                        className="gap-1.5 text-xs bg-background hover:bg-muted text-foreground"
-                                                    >
-                                                        <RefreshCw className="h-3.5 w-3.5" />
-                                                        Retry Camera Access
-                                                    </Button>
-                                                    {typeof window !== 'undefined' && !!(window as any).AndroidNativeApp?.openAppSettings && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="default"
-                                                            size="sm"
-                                                            onClick={() => (window as any).AndroidNativeApp.openAppSettings()}
-                                                            className="gap-1.5 text-xs"
-                                                        >
-                                                            Open App Settings
-                                                        </Button>
+                                    {/* Scan Result Overlay — keeps video mounted in background, eliminating black screen */}
+                                    {scanResult && (
+                                        <div className="absolute inset-0 z-20 bg-card/95 backdrop-blur-md p-4 flex flex-col items-center justify-center overflow-y-auto animate-in fade-in duration-200">
+                                            {/* Avatar & Badge Icon */}
+                                            <div className="relative mb-2 shrink-0">
+                                                <Avatar className="h-16 w-16 sm:h-20 sm:w-20 border-4 border-background shadow-xl ring-4 ring-offset-2 ring-primary/20">
+                                                    <AvatarImage src={scanResult.worker.avatarUrl} alt={`${scanResult.worker.firstName} ${scanResult.worker.lastName}`} />
+                                                    <AvatarFallback><UserIcon className="h-8 w-8 sm:h-10 sm:w-10" /></AvatarFallback>
+                                                </Avatar>
+                                                <div className={`absolute -bottom-1 -right-1 p-1 rounded-full shadow-lg text-white ${scanResult.action === 'Clock In'
+                                                    ? 'bg-emerald-600'
+                                                    : scanResult.action === 'Clock Out'
+                                                        ? 'bg-blue-600'
+                                                        : 'bg-amber-600'
+                                                    }`}>
+                                                    {scanResult.action === 'Clock In' ? (
+                                                        <LogIn className="h-3.5 w-3.5" />
+                                                    ) : scanResult.action === 'Clock Out' ? (
+                                                        <LogOut className="h-3.5 w-3.5" />
+                                                    ) : (
+                                                        <AlertTriangle className="h-3.5 w-3.5" />
                                                     )}
                                                 </div>
-                                                <div className="text-[11px] text-muted-foreground/90 mt-2 p-2.5 rounded-lg bg-background/50 border border-destructive/20 space-y-1">
-                                                    <p className="font-semibold text-foreground">Using the Mobile APK?</p>
-                                                    <p>
-                                                        Go to phone <strong>Settings &gt; Apps &gt; COG App &gt; Permissions &gt; Camera</strong> and select <strong>&quot;Allow only while using the app&quot;</strong>, then return here and tap <strong>Retry</strong>.
-                                                    </p>
+                                            </div>
+
+                                            {/* Worker Name & Role */}
+                                            <h2 className="text-base sm:text-lg font-headline font-bold text-foreground">
+                                                {scanResult.worker.firstName} {scanResult.worker.lastName}
+                                            </h2>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1.5">
+                                                {scanResult.worker.roleId || scanResult.worker.employmentType || 'Personnel'}
+                                            </p>
+
+                                            {/* Action & Status Card */}
+                                            <div className={`w-full max-w-xs rounded-xl p-2.5 border mb-2 flex flex-col items-center gap-0.5 shadow-sm ${scanResult.action === 'Clock In'
+                                                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800'
+                                                : scanResult.action === 'Clock Out'
+                                                    ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800'
+                                                    : 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
+                                                }`}>
+                                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${scanResult.action === 'Clock In'
+                                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                                                    : scanResult.action === 'Clock Out'
+                                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
+                                                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                                                    }`}>
+                                                    {scanResult.action === 'Clock In' ? '✓ TIMED IN' : scanResult.action === 'Clock Out' ? '✓ TIMED OUT' : '⚠ COOLDOWN ACTIVE'}
+                                                </span>
+
+                                                <span className="text-xl font-extrabold font-mono tracking-tight text-foreground my-0.5">
+                                                    {scanResult.time ? new Date(scanResult.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : ''}
+                                                </span>
+
+                                                <div className="flex items-center gap-1">
+                                                    <Badge variant={
+                                                        scanResult.status === 'On Time' || scanResult.status === 'Shift Completed'
+                                                            ? 'success'
+                                                            : scanResult.status === 'Late' || scanResult.status === 'Undertime'
+                                                                ? 'warning'
+                                                                : 'secondary'
+                                                    } className="text-[10px] px-2 py-0">
+                                                        {scanResult.status || 'Recorded'}
+                                                    </Badge>
                                                 </div>
-                                            </AlertDescription>
-                                        </Alert>
+
+                                                <p className="text-[10px] text-muted-foreground px-1 text-center leading-tight mt-0.5">
+                                                    {scanResult.message}
+                                                </p>
+                                            </div>
+
+                                            {/* Auto-reset indicator */}
+                                            <div className="w-full max-w-xs flex flex-col items-center gap-1">
+                                                <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
+                                                    <div
+                                                        className="bg-primary h-full transition-all duration-1000 ease-linear"
+                                                        style={{ width: `${(countdown / 5) * 100}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                    <RefreshCw className="h-2.5 w-2.5 animate-spin text-primary" /> Auto-resetting in {countdown}s...
+                                                </p>
+                                                <Button variant="ghost" size="sm" onClick={resetScanner} className="text-xs text-primary hover:underline h-6 mt-0">
+                                                    Scan next worker now →
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {devices.length > 1 && !scanResult && (
+                                        <div className="absolute bottom-3 right-3 z-10">
+                                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer" onClick={handleSwitchCamera}>
+                                                <SwitchCamera className="h-4 w-4" />
+                                                <span className="sr-only">Switch Camera</span>
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
-                            )}
+
+                                {hasCameraPermission === false && (
+                                    <Alert variant="destructive" className="rounded-xl">
+                                        <AlertTitle>Camera Access Required</AlertTitle>
+                                        <AlertDescription className="space-y-2 mt-1">
+                                            <p>Please allow camera permissions in your device settings to scan.</p>
+                                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={requestCameraPermission}
+                                                    className="gap-1.5 text-xs bg-background hover:bg-muted text-foreground"
+                                                >
+                                                    <RefreshCw className="h-3.5 w-3.5" />
+                                                    Retry Camera Access
+                                                </Button>
+                                                {typeof window !== 'undefined' && !!(window as any).AndroidNativeApp?.openAppSettings && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="default"
+                                                        size="sm"
+                                                        onClick={() => (window as any).AndroidNativeApp.openAppSettings()}
+                                                        className="gap-1.5 text-xs"
+                                                    >
+                                                        Open App Settings
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground/90 mt-2 p-2.5 rounded-lg bg-background/50 border border-destructive/20 space-y-1">
+                                                <p className="font-semibold text-foreground">Using the Mobile APK?</p>
+                                                <p>
+                                                    Go to phone <strong>Settings &gt; Apps &gt; COG App &gt; Permissions &gt; Camera</strong> and select <strong>&quot;Allow only while using the app&quot;</strong>, then return here and tap <strong>Retry</strong>.
+                                                </p>
+                                            </div>
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

@@ -1437,50 +1437,12 @@ export function InventoryTable({
 
               {/* ── FORM BODY ── */}
               <div className="p-5 space-y-4 overflow-y-auto flex-1">
-                {/* 1. Action Type Selection */}
-                <div className="p-4 rounded-2xl border border-border/70 bg-card/60 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2 pb-1 border-b border-border/50">
-                    <SlidersHorizontal className="h-4 w-4 text-primary shrink-0" />
-                    <span className="text-xs font-bold text-foreground uppercase tracking-wider">
-                      Adjustment Type
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setAdjustAction('Stock In')}
-                      className={cn(
-                        "flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl border font-bold text-xs transition-all cursor-pointer shadow-2xs",
-                        adjustAction === 'Stock In'
-                          ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-xs"
-                          : "bg-background/80 border-border/60 text-foreground hover:bg-muted/60"
-                      )}
-                    >
-                      <ArrowUp className="h-4 w-4 shrink-0" />
-                      <span className="truncate">Stock In (Add)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAdjustAction('Stock Out')}
-                      className={cn(
-                        "flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl border font-bold text-xs transition-all cursor-pointer shadow-2xs",
-                        adjustAction === 'Stock Out'
-                          ? "bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-xs"
-                          : "bg-background/80 border-border/60 text-foreground hover:bg-muted/60"
-                      )}
-                    >
-                      <ArrowDown className="h-4 w-4 shrink-0" />
-                      <span className="truncate">Stock Out (Deduct)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. Quantity & Presets */}
+                {/* 1. Quantity Input (Max 6 digits, no stepper, no preset buttons) */}
                 <div className="p-4 rounded-2xl border border-border/70 bg-card/60 shadow-2xs space-y-3">
                   <div className="flex items-center gap-2 pb-1 border-b border-border/50">
                     <Boxes className="h-4 w-4 text-primary shrink-0" />
                     <span className="text-xs font-bold text-foreground uppercase tracking-wider">
-                      Quantity &amp; Amount
+                      Quantity
                     </span>
                   </div>
                   <div className="space-y-1.5">
@@ -1488,31 +1450,20 @@ export function InventoryTable({
                       <span>Quantity to {adjustAction === 'Stock In' ? 'Add' : 'Deduct'}</span>
                       <span className="text-destructive font-bold">*</span>
                     </Label>
-                    <div className="flex items-center gap-2 sm:gap-2.5 w-full">
+                    <div className="w-full">
                       <Input
-                        type="number"
-                        min={1}
-                        value={adjustQuantity}
-                        onChange={(e) => setAdjustQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        className="h-10 text-xs font-bold rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs flex-1 min-w-0"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        placeholder="Enter quantity"
+                        value={adjustQuantity === 0 ? '' : adjustQuantity}
+                        onChange={(e) => {
+                          const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setAdjustQuantity(digitsOnly === '' ? 0 : parseInt(digitsOnly, 10));
+                        }}
+                        className="h-10 text-xs font-bold rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <div className="flex gap-1.5 shrink-0">
-                        {[1, 5, 10].map((qty) => (
-                          <button
-                            key={qty}
-                            type="button"
-                            onClick={() => setAdjustQuantity(qty)}
-                            className={cn(
-                              "h-10 px-3 sm:px-3.5 text-xs font-bold rounded-xl border transition-all cursor-pointer shadow-2xs shrink-0",
-                              adjustQuantity === qty
-                                ? "bg-sidebar text-white border-sidebar"
-                                : "bg-background/80 border-border/60 text-foreground hover:bg-muted/60"
-                            )}
-                          >
-                            +{qty}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1574,7 +1525,7 @@ export function InventoryTable({
                   variant="outline"
                   onClick={() => setStockAdjustItem(null)}
                   className="rounded-xl text-xs h-9 px-4 font-semibold border-border/80 cursor-pointer hover:bg-muted/60 shrink-0"
-                  disabled={isAdjusting}
+                  disabled={isAdjusting || !adjustQuantity || adjustQuantity <= 0}
                 >
                   Cancel
                 </Button>

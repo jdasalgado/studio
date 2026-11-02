@@ -212,10 +212,7 @@ function InventoryPageContent() {
                 : activeTab === "settings"
                 ? "Checklist Management"
                 : "Stock Monitoring & Assets"}
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 px-2.5 py-0.5 rounded-full shadow-2xs font-sans">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live
-              </span>
+
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
               {activeTab === "items"

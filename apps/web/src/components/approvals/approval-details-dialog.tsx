@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, Button } from "@studio/ui";
@@ -164,7 +164,7 @@ export function ApprovalDetailsDialog({
   const isSelfRequested = Boolean(
     (currentWorkerId && (request.workerId === currentWorkerId || requesterWorker?.id === currentWorkerId)) ||
     (currentWorkerName && request.requester?.trim().toLowerCase() === currentWorkerName.toLowerCase()) ||
-    (requesterWorker && `${requesterWorker.firstName || ""} ${requesterWorker.lastName || ""}`.trim().toLowerCase() === request.requester?.trim().toLowerCase())
+    (currentWorkerName && requesterWorker && `${requesterWorker.firstName || ""} ${requesterWorker.lastName || ""}`.trim().toLowerCase() === currentWorkerName.toLowerCase())
   );
 
   const contextDescription = (() => {
@@ -228,7 +228,7 @@ export function ApprovalDetailsDialog({
                 {request.requester}
               </p>
               <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                {reqDate ? format(reqDate, "MMM d, yyyy • h:mm a") : "—"}
+                {reqDate ? format(reqDate, "MMM d, yyyy â€¢ h:mm a") : "â€”"}
               </p>
             </div>
           </div>
@@ -244,7 +244,7 @@ export function ApprovalDetailsDialog({
           )}
 
           {/* 2b. Alert when non-admin Ministry Head views self-submitted booking */}
-          {request.type === "Room Booking" && !isAdmin && isMinistryHead && isSelfRequested && (
+          {request.type === "Room Booking" && !isAdmin && isMinistryHead && isSelfRequested && !canManage && (
             <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200/70 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5 shadow-2xs">
               <Info className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span className="font-medium">
@@ -348,7 +348,7 @@ export function ApprovalDetailsDialog({
                           Purpose
                         </p>
                         <p className="text-xs font-semibold text-foreground mt-0.5">
-                          {purpose || "—"}
+                          {purpose || "â€”"}
                         </p>
                       </div>
                     </>
@@ -369,7 +369,8 @@ export function ApprovalDetailsDialog({
           )}
 
           {/* 5. Approve / Reject Actions */}
-          {canManage && request.status.startsWith("Pending") && (onApprove || onReject) && !(!isAdmin && isSelfRequested) && !(!isAdmin && request.type === "Room Booking" && request.status === "Pending Admin Approval") && (() => {
+          {/* canManage is already computed by the parent (checkCanManage) which handles all role/self-request guards */}
+          {canManage && request.status.startsWith("Pending") && (onApprove || onReject) && (() => {
             const statusStr = request.status as string;
             const isWaitingForMinistryHead =
               request.type === "Room Booking" &&
@@ -380,27 +381,9 @@ export function ApprovalDetailsDialog({
                 statusStr === "Pending Ministry Head" ||
                 statusStr.toLowerCase().includes("ministry")
               );
-            // Admins cannot approve until Ministry Head gives initial approval.
-            // But Ministry Heads can approve requests waiting for Ministry Head approval!
-            const isReservedBySelfMH =
-              request.type === "Room Booking" &&
-              !isAdmin &&
-              Boolean(
-                isMinistryHead &&
-                currentWorkerId &&
-                (request.workerId === currentWorkerId || requesterWorker?.id === currentWorkerId)
-              );
-
-            const isPendingAdminForMH =
-              request.type === "Room Booking" &&
-              request.status === "Pending Admin Approval" &&
-              isMinistryHead &&
-              !isAdmin;
-
+            // Pure admins (not ministry heads) cannot approve until Ministry Head gives initial approval.
             const isActionDisabled = Boolean(
-              (isAdmin && !isMinistryHead && isWaitingForMinistryHead) ||
-              isReservedBySelfMH ||
-              isPendingAdminForMH
+              isAdmin && !isMinistryHead && isWaitingForMinistryHead
             );
 
             return (
@@ -420,13 +403,7 @@ export function ApprovalDetailsDialog({
                         ? "opacity-50 cursor-not-allowed pointer-events-none"
                         : "hover:bg-rose-100 dark:hover:bg-rose-950/40 active:scale-95 cursor-pointer"
                     )}
-                    title={
-                      isReservedBySelfMH
-                        ? "Only an Admin can approve this request. Ministry Heads cannot approve their own requests."
-                        : isActionDisabled
-                          ? "Awaiting Ministry Head response"
-                          : undefined
-                    }
+                    title={isActionDisabled ? "Awaiting Ministry Head response" : undefined}
                   >
                     Reject
                   </button>
@@ -446,13 +423,7 @@ export function ApprovalDetailsDialog({
                         ? "opacity-50 cursor-not-allowed pointer-events-none"
                         : "hover:bg-emerald-100 dark:hover:bg-emerald-950/40 active:scale-95 cursor-pointer"
                     )}
-                    title={
-                      isReservedBySelfMH
-                        ? "Only an Admin can approve this request. Ministry Heads cannot approve their own requests."
-                        : isActionDisabled
-                          ? "Awaiting Ministry Head response"
-                          : undefined
-                    }
+                    title={isActionDisabled ? "Awaiting Ministry Head response" : undefined}
                   >
                     Approve
                   </button>
