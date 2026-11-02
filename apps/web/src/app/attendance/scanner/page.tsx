@@ -110,6 +110,14 @@ export default function QRScannerPage() {
     const { settings: shiftSettings } = useAttendanceSettings();
 
     const requestCameraPermission = useCallback(async () => {
+        if (typeof window !== 'undefined' && (window as any).AndroidNativeApp?.requestCameraPermission) {
+            try {
+                (window as any).AndroidNativeApp.requestCameraPermission();
+            } catch (e) {
+                console.error("Native camera request error:", e);
+            }
+        }
+
         if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
             toast({ variant: 'destructive', title: 'Camera Not Supported', description: 'Your browser or device does not support camera access.' });
             setHasCameraPermission(false);
@@ -762,17 +770,36 @@ export default function QRScannerPage() {
                                         <Alert variant="destructive" className="rounded-xl">
                                             <AlertTitle>Camera Access Required</AlertTitle>
                                             <AlertDescription className="space-y-2 mt-1">
-                                                <p>Please allow camera permissions in your browser to scan.</p>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={requestCameraPermission}
-                                                    className="gap-1.5 text-xs bg-background hover:bg-muted text-foreground"
-                                                >
-                                                    <RefreshCw className="h-3.5 w-3.5" />
-                                                    Retry Camera Access
-                                                </Button>
+                                                <p>Please allow camera permissions in your device settings to scan.</p>
+                                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={requestCameraPermission}
+                                                        className="gap-1.5 text-xs bg-background hover:bg-muted text-foreground"
+                                                    >
+                                                        <RefreshCw className="h-3.5 w-3.5" />
+                                                        Retry Camera Access
+                                                    </Button>
+                                                    {typeof window !== 'undefined' && !!(window as any).AndroidNativeApp?.openAppSettings && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="default"
+                                                            size="sm"
+                                                            onClick={() => (window as any).AndroidNativeApp.openAppSettings()}
+                                                            className="gap-1.5 text-xs"
+                                                        >
+                                                            Open App Settings
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                                <div className="text-[11px] text-muted-foreground/90 mt-2 p-2.5 rounded-lg bg-background/50 border border-destructive/20 space-y-1">
+                                                    <p className="font-semibold text-foreground">Using the Mobile APK?</p>
+                                                    <p>
+                                                        Go to phone <strong>Settings &gt; Apps &gt; COG App &gt; Permissions &gt; Camera</strong> and select <strong>&quot;Allow only while using the app&quot;</strong>, then return here and tap <strong>Retry</strong>.
+                                                    </p>
+                                                </div>
                                             </AlertDescription>
                                         </Alert>
                                     )}

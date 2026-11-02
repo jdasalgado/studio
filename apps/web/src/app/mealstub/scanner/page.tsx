@@ -608,7 +608,22 @@ export default function QRScannerPage() {
                             {hasCameraPermission === false && (
                                 <Alert variant="destructive" className="rounded-xl">
                                     <AlertTitle>Camera Access Required</AlertTitle>
-                                    <AlertDescription>Please allow camera permissions in your browser to scan.</AlertDescription>
+                                    <AlertDescription className="space-y-2 mt-1">
+                                        <p>Please allow camera permissions in your device settings to scan.</p>
+                                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                                            {typeof window !== 'undefined' && !!(window as any).AndroidNativeApp?.openAppSettings && (
+                                                <Button
+                                                    type="button"
+                                                    variant="default"
+                                                    size="sm"
+                                                    onClick={() => (window as any).AndroidNativeApp.openAppSettings()}
+                                                    className="gap-1.5 text-xs"
+                                                >
+                                                    Open App Settings
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </AlertDescription>
                                 </Alert>
                             )}
                         </div>
