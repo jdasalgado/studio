@@ -171,10 +171,15 @@ model Room {
   elements               String[]
   areaId                 String
   weight                 Int?
+  status                 String                    @default("Active")
+  numChairs              Int?
+  numTables              Int?
   bookings               Booking[]
   venueBookings          VenueBooking[]            @relation("RoomVenueBookings")
   assistanceConfigurations AssistanceConfiguration[] @relation("RoomAssistanceConfigs")
   area                   Area                      @relation(fields: [areaId], references: [id])
+
+  @@index([status])
 }
 
 model Area {

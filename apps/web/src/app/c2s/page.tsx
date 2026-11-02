@@ -67,7 +67,7 @@ import {
   Separator,
 } from "@studio/ui";
 import { cn, toJsDate } from "@/lib/utils";
-import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail } from "@/lib/validation";
+import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail, isValidName, cleanName, MAX_LENGTHS } from "@/lib/validation";
 import {
   AlertCircle,
   Plus,
@@ -618,6 +618,22 @@ const DevotionForm = ({
       });
       return;
     }
+    if (reflectionNotes.trim().length > MAX_LENGTHS.NOTES) {
+      toast({
+        variant: "destructive",
+        title: "Reflection Notes Too Long",
+        description: `Reflection notes must not exceed ${MAX_LENGTHS.NOTES} characters.`,
+      });
+      return;
+    }
+    if (prayerRequests && prayerRequests.trim().length > MAX_LENGTHS.MESSAGE) {
+      toast({
+        variant: "destructive",
+        title: "Prayer Requests Too Long",
+        description: `Prayer requests must not exceed ${MAX_LENGTHS.MESSAGE} characters.`,
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -832,9 +848,10 @@ const DevotionForm = ({
         </Label>
         <Textarea
           rows={3}
+          maxLength={MAX_LENGTHS.NOTES}
           placeholder="Write key reflections on the lesson, mentee's response, or personal insights..."
           value={reflectionNotes}
-          onChange={(e) => setReflectionNotes(e.target.value)}
+          onChange={(e) => setReflectionNotes(e.target.value.slice(0, MAX_LENGTHS.NOTES))}
           className="rounded-xl border border-slate-200/90 dark:border-border text-xs bg-white dark:bg-muted/20 p-3 shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar resize-none transition-all placeholder:text-muted-foreground/60"
         />
       </div>
@@ -846,9 +863,10 @@ const DevotionForm = ({
         </Label>
         <Textarea
           rows={2}
+          maxLength={MAX_LENGTHS.MESSAGE}
           placeholder="Any prayer requests or prayer items from the mentee..."
           value={prayerRequests}
-          onChange={(e) => setPrayerRequests(e.target.value)}
+          onChange={(e) => setPrayerRequests(e.target.value.slice(0, MAX_LENGTHS.MESSAGE))}
           className="rounded-xl border border-slate-200/90 dark:border-border text-xs bg-white dark:bg-muted/20 p-3 shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar resize-none transition-all placeholder:text-muted-foreground/60"
         />
       </div>
@@ -1393,6 +1411,22 @@ const MenteeForm = ({
           });
           return;
         }
+        if (!isValidName(formData.firstName.trim(), 2, MAX_LENGTHS.FIRST_NAME)) {
+          toast({
+            variant: "destructive",
+            title: "Invalid First Name",
+            description: `First name must contain only letters and not exceed ${MAX_LENGTHS.FIRST_NAME} characters.`,
+          });
+          return;
+        }
+        if (!isValidName(formData.lastName.trim(), 2, MAX_LENGTHS.LAST_NAME)) {
+          toast({
+            variant: "destructive",
+            title: "Invalid Last Name",
+            description: `Last name must contain only letters and not exceed ${MAX_LENGTHS.LAST_NAME} characters.`,
+          });
+          return;
+        }
         if (!formData.email.trim()) {
           toast({
             variant: "destructive",
@@ -1401,11 +1435,11 @@ const MenteeForm = ({
           });
           return;
         }
-        if (!isValidEmail(formData.email.trim())) {
+        if (!isValidEmail(formData.email.trim(), MAX_LENGTHS.EMAIL)) {
           toast({
             variant: "destructive",
             title: "Invalid Email Address",
-            description: "Please enter a valid email format.",
+            description: `Please enter a valid email format (up to ${MAX_LENGTHS.EMAIL} characters).`,
           });
           return;
         }
@@ -1452,11 +1486,12 @@ const MenteeForm = ({
                 name="firstName"
                 autoComplete="given-name"
                 required
+                maxLength={MAX_LENGTHS.FIRST_NAME}
                 className="h-9 rounded-xl bg-background border border-border/70 text-xs font-medium focus-visible:ring-primary"
                 placeholder="e.g. Samantha"
                 value={formData.firstName}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, firstName: e.target.value }))
+                  setFormData((prev) => ({ ...prev, firstName: cleanName(e.target.value, MAX_LENGTHS.FIRST_NAME) }))
                 }
               />
             </div>
@@ -1470,11 +1505,12 @@ const MenteeForm = ({
                 name="lastName"
                 autoComplete="family-name"
                 required
+                maxLength={MAX_LENGTHS.LAST_NAME}
                 className="h-9 rounded-xl bg-background border border-border/70 text-xs font-medium focus-visible:ring-primary"
                 placeholder="e.g. Conche"
                 value={formData.lastName}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, lastName: e.target.value }))
+                  setFormData((prev) => ({ ...prev, lastName: cleanName(e.target.value, MAX_LENGTHS.LAST_NAME) }))
                 }
               />
             </div>
@@ -1492,11 +1528,12 @@ const MenteeForm = ({
                 type="email"
                 autoComplete="email"
                 required
+                maxLength={MAX_LENGTHS.EMAIL}
                 className="h-9 pl-9 rounded-xl bg-background border border-border/70 text-xs font-medium focus-visible:ring-primary"
                 placeholder="e.g. samantha.conche@mentee.org"
                 value={formData.email}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, email: e.target.value }))
+                  setFormData((prev) => ({ ...prev, email: e.target.value.slice(0, MAX_LENGTHS.EMAIL) }))
                 }
               />
             </div>

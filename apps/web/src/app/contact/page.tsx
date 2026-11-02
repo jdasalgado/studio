@@ -19,9 +19,10 @@ import {
 } from "lucide-react";
 import { Button, Input, Textarea, Label } from "@studio/ui";
 import { useToast } from "@/hooks/use-toast";
+import { showSubmitSuccess, showSubmitError } from "@/hooks/use-submission-modal";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing/landing-footer";
-import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail } from "@/lib/validation";
+import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail, isValidName, cleanName, MAX_LENGTHS } from "@/lib/validation";
 import { createInquiry } from "@/actions/db";
 
 export default function ContactPage() {
@@ -58,11 +59,29 @@ export default function ContactPage() {
       return;
     }
 
-    if (!isValidEmail(email.trim())) {
+    if (name.trim().length > MAX_LENGTHS.NAME) {
+      toast({
+        variant: "destructive",
+        title: "Name Too Long",
+        description: `Full name must not exceed ${MAX_LENGTHS.NAME} characters.`,
+      });
+      return;
+    }
+
+    if (!isValidName(name.trim(), 2, MAX_LENGTHS.NAME)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Full Name",
+        description: `Please enter a valid name (letters only, up to ${MAX_LENGTHS.NAME} characters).`,
+      });
+      return;
+    }
+
+    if (!isValidEmail(email.trim(), MAX_LENGTHS.EMAIL)) {
       toast({
         variant: "destructive",
         title: "Invalid Email Address",
-        description: "Please enter a valid email address.",
+        description: `Please enter a valid email address (up to ${MAX_LENGTHS.EMAIL} characters).`,
       });
       return;
     }
@@ -72,6 +91,15 @@ export default function ContactPage() {
         variant: "destructive",
         title: "Invalid Contact Number",
         description: "Phone number must be exactly 11 digits starting with 09 (e.g. 09171234567) and numbers only.",
+      });
+      return;
+    }
+
+    if (message.trim().length > MAX_LENGTHS.MESSAGE) {
+      toast({
+        variant: "destructive",
+        title: "Message Too Long",
+        description: `Message must not exceed ${MAX_LENGTHS.MESSAGE} characters.`,
       });
       return;
     }
@@ -86,9 +114,10 @@ export default function ContactPage() {
       });
 
       if (res.success) {
-        toast({
+        showSubmitSuccess({
           title: "Message Sent Successfully!",
-          description: "Thank you for reaching out to COG Dasmariñas. Our ministry team has received your message.",
+          description: "Thank you for reaching out to COG Dasmariñas. Our ministry team has received your message and will get back to you shortly.",
+          confirmText: "Done",
         });
         setName("");
         setEmail("");
@@ -321,11 +350,14 @@ export default function ContactPage() {
                   <Input
                     id="contact-name"
                     placeholder="Juan Dela Cruz"
+                    maxLength={MAX_LENGTHS.NAME}
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => setName(cleanName(e.target.value, MAX_LENGTHS.NAME))}
                     required
                     className="h-12 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
                   />
+                  <div className="flex justify-end">
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -335,9 +367,10 @@ export default function ContactPage() {
                   <Input
                     id="contact-email"
                     type="email"
+                    maxLength={MAX_LENGTHS.EMAIL}
                     placeholder="juan@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value.slice(0, MAX_LENGTHS.EMAIL))}
                     required
                     className="h-12 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
                   />
@@ -367,12 +400,15 @@ export default function ContactPage() {
                 <Textarea
                   id="contact-message"
                   placeholder="How can we pray for you or assist you?"
+                  maxLength={MAX_LENGTHS.MESSAGE}
                   rows={5}
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => setMessage(e.target.value.slice(0, MAX_LENGTHS.MESSAGE))}
                   required
                   className="rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 resize-none"
                 />
+                <div className="flex justify-end">
+                </div>
               </div>
 
               <Button

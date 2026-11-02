@@ -19,6 +19,7 @@ import Script from "next/script";
 import { AuthSync } from "./auth-sync";
 import { ReactQueryProvider } from "@/providers/react-query-provider";
 import { CookieConsentBanner } from "@/components/common/cookie-consent-banner";
+import { SubmissionConfirmationModal } from "@/components/common/submission-confirmation-modal";
 
 export default function RootLayout({
   children,
@@ -64,6 +65,7 @@ export default function RootLayout({
           <AuthSync>
             {children}
             <Toaster />
+            <SubmissionConfirmationModal />
             <CookieConsentBanner />
           </AuthSync>
         </ReactQueryProvider>

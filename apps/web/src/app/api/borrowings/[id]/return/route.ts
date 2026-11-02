@@ -5,7 +5,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await req.json();
-    const { returnNotes, returnCondition, returnChecklist, returnPhotos, damaged, quantity = 1 } = body;
+    const { returnNotes, returnCondition, returnChecklist, returnPhotos, damaged, quantity = 1, actorId, actorName, actorEmail } = body;
 
     const borrowing = await prisma.inventoryBorrowing.findUnique({
       where: { id },

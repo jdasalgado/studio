@@ -38,7 +38,7 @@ import { WorkerActivityLog } from "./worker-activity-log";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuditLog } from "@/hooks/use-audit-log";
-import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail } from "@/lib/validation";
+import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail, cleanName, isValidName, MAX_LENGTHS } from "@/lib/validation";
 import {
   updateWorker as updateWorkerSql,
   assignRolesToWorker,
@@ -213,7 +213,9 @@ export function EditWorkerDialog({
     if (e) e.preventDefault();
     if (!worker?.id) return;
 
-    if (!formData.firstName?.trim() || !formData.lastName?.trim()) {
+    const trimmedFirst = formData.firstName?.trim() || "";
+    const trimmedLast = formData.lastName?.trim() || "";
+    if (!trimmedFirst || !trimmedLast) {
       toast({
         variant: "destructive",
         title: "Required Fields Missing",
@@ -221,12 +223,46 @@ export function EditWorkerDialog({
       });
       return;
     }
-
-    if (formData.email?.trim() && !isValidEmail(formData.email.trim())) {
+    if (!isValidName(trimmedFirst) || trimmedFirst.length > MAX_LENGTHS.FIRST_NAME) {
       toast({
         variant: "destructive",
-        title: "Invalid Email Address",
-        description: "Please enter a valid email format.",
+        title: "Invalid First Name",
+        description: `First name cannot exceed ${MAX_LENGTHS.FIRST_NAME} characters or 8 words.`,
+      });
+      return;
+    }
+    if (!isValidName(trimmedLast) || trimmedLast.length > MAX_LENGTHS.LAST_NAME) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Last Name",
+        description: `Last name cannot exceed ${MAX_LENGTHS.LAST_NAME} characters or 8 words.`,
+      });
+      return;
+    }
+
+    if (formData.email?.trim()) {
+      if (formData.email.trim().length > MAX_LENGTHS.EMAIL || !isValidEmail(formData.email.trim())) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Email Address",
+          description: "Please enter a valid email address (up to 100 characters).",
+        });
+        return;
+      }
+    }
+    if (formData.address && formData.address.length > MAX_LENGTHS.ADDRESS) {
+      toast({
+        variant: "destructive",
+        title: "Address Too Long",
+        description: `Address must not exceed ${MAX_LENGTHS.ADDRESS} characters.`,
+      });
+      return;
+    }
+    if (formData.remarks && formData.remarks.length > 500) {
+      toast({
+        variant: "destructive",
+        title: "Remarks Too Long",
+        description: "Remarks must not exceed 500 characters.",
       });
       return;
     }
@@ -449,9 +485,10 @@ export function EditWorkerDialog({
                     </Label>
                     <Input
                       id="edit-firstName"
+                      maxLength={MAX_LENGTHS.FIRST_NAME}
                       value={formData.firstName || ""}
                       onChange={(e) =>
-                        setFormData({ ...formData, firstName: e.target.value })
+                        setFormData({ ...formData, firstName: cleanName(e.target.value, MAX_LENGTHS.FIRST_NAME) })
                       }
                       placeholder="e.g. John"
                       className="h-9 text-xs rounded-xl"
@@ -465,9 +502,10 @@ export function EditWorkerDialog({
                     </Label>
                     <Input
                       id="edit-lastName"
+                      maxLength={MAX_LENGTHS.LAST_NAME}
                       value={formData.lastName || ""}
                       onChange={(e) =>
-                        setFormData({ ...formData, lastName: e.target.value })
+                        setFormData({ ...formData, lastName: cleanName(e.target.value, MAX_LENGTHS.LAST_NAME) })
                       }
                       placeholder="e.g. Doe"
                       className="h-9 text-xs rounded-xl"
@@ -482,6 +520,7 @@ export function EditWorkerDialog({
                     <Input
                       id="edit-email"
                       type="email"
+                      maxLength={MAX_LENGTHS.EMAIL}
                       value={formData.email || ""}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
@@ -530,6 +569,7 @@ export function EditWorkerDialog({
                     </Label>
                     <Input
                       id="edit-address"
+                      maxLength={MAX_LENGTHS.ADDRESS}
                       value={formData.address || ""}
                       onChange={(e) =>
                         setFormData({ ...formData, address: e.target.value })

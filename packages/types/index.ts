@@ -107,6 +107,9 @@ export type Room = {
     elements?: string[]; // Array of VenueElement IDs available in this room
     areaId: string;
     weight?: number;
+    status?: 'Active' | 'Maintenance';
+    numChairs?: number | null;
+    numTables?: number | null;
 };
 
 export type Area = {
@@ -235,5 +238,6 @@ export type Inquiry = {
     createdAt: TimestampLike | Date;
     updatedAt?: TimestampLike | Date;
 };
+
 
 

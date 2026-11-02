@@ -271,6 +271,7 @@ export function AssistanceConfigForm({
                                         </Label>
                                         <Input
                                             id={`item-name-${index}`}
+                                            maxLength={100}
                                             value={item.name}
                                             onChange={(e) => updateItem(index, { name: e.target.value })}
                                             placeholder="e.g., Projector, Tech Support"
@@ -286,10 +287,11 @@ export function AssistanceConfigForm({
                                             id={`item-qty-${index}`}
                                             type="number"
                                             min={1}
+                                            max={10000}
                                             value={item.quantity}
                                             onChange={(e) =>
                                                 updateItem(index, {
-                                                    quantity: Math.max(1, parseInt(e.target.value, 10) || 1),
+                                                    quantity: Math.min(10000, Math.max(1, parseInt(e.target.value, 10) || 1)),
                                                 })
                                             }
                                             className="h-9 rounded-xl border-slate-200/90 dark:border-border text-xs bg-white dark:bg-background shadow-2xs font-semibold"
@@ -303,6 +305,7 @@ export function AssistanceConfigForm({
                                     </Label>
                                     <Textarea
                                         id={`item-desc-${index}`}
+                                        maxLength={500}
                                         value={item.description}
                                         onChange={(e) => updateItem(index, { description: e.target.value })}
                                         placeholder="Specific instructions, specs or models required..."

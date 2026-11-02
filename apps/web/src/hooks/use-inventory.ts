@@ -88,7 +88,7 @@ export function useInventory() {
   const [logsTake, setLogsTake] = useState<number>(30);
   const [mutationLoading, setMutationLoading] = useState(false);
 
-  // 1. Dashboard Stats Query (Cached & Deduplicated across components)
+  // 1. Dashboard Stats Query (Cached & Deduplicated across components, 2s live polling)
   const statsQuery = useQuery({
     queryKey: ['inventory', 'stats'],
     queryFn: async () => {
@@ -96,7 +96,10 @@ export function useInventory() {
       if (!res.ok) throw new Error('Failed to fetch stats');
       return await res.json();
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always',
   });
 
   // 2. Categories Query (5 min cache)
@@ -123,7 +126,7 @@ export function useInventory() {
     staleTime: 5 * 60_000,
   });
 
-  // 4. Activity Logs Query
+  // 4. Activity Logs Query (Live 2s polling)
   const logsQuery = useQuery<InventoryLog[]>({
     queryKey: ['inventory', 'logs', logsTake],
     queryFn: async () => {
@@ -132,10 +135,13 @@ export function useInventory() {
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always',
   });
 
-  // 5. Items Query (Param-based caching with placeholderData for smooth paging)
+  // 5. Items Query (Live 2s polling with placeholderData for smooth paging)
   const itemsQuery = useQuery({
     queryKey: ['inventory', 'items', itemParams],
     queryFn: async () => {
@@ -144,11 +150,14 @@ export function useInventory() {
       if (!res.ok) throw new Error('Failed to fetch items');
       return await res.json();
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always',
     placeholderData: (prev) => prev,
   });
 
-  // 6. Borrowings Query
+  // 6. Borrowings Query (Live 2s polling)
   const borrowingsQuery = useQuery({
     queryKey: ['inventory', 'borrowings', borrowingParams],
     queryFn: async () => {
@@ -157,13 +166,17 @@ export function useInventory() {
       if (!res.ok) throw new Error('Failed to fetch borrowings');
       return await res.json();
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always',
     placeholderData: (prev) => prev,
   });
 
   // Cache Invalidation Helper
   const invalidateInventory = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    queryClient.invalidateQueries({ queryKey: ['transaction-logs'] });
   }, [queryClient]);
 
   // Backward-compatible trigger functions
@@ -192,12 +205,25 @@ export function useInventory() {
   }, []);
 
   // Quick Action
-  const updateStock = async (id: string, action: 'Stock In' | 'Stock Out' | 'Adjustment', quantity: number, notes?: string) => {
+  const updateStock = async (
+    id: string,
+    action: 'Stock In' | 'Stock Out' | 'Adjustment',
+    quantity: number,
+    notes?: string,
+    actor?: { id?: string | null; name?: string | null; email?: string | null }
+  ) => {
     try {
       const res = await fetch(`/api/inventory/items/${id}/stock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, quantity, notes }),
+        body: JSON.stringify({
+          action,
+          quantity,
+          notes,
+          actorId: actor?.id,
+          actorName: actor?.name,
+          actorEmail: actor?.email,
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -249,9 +275,14 @@ export function useInventory() {
     }
   };
 
-  const deleteItem = async (id: string) => {
+  const deleteItem = async (id: string, actor?: { actorId?: string; actorName?: string; actorEmail?: string }) => {
     try {
-      const res = await fetch(`/api/inventory/items/${id}`, {
+      const q = new URLSearchParams();
+      if (actor?.actorId) q.set('actorId', actor.actorId);
+      if (actor?.actorName) q.set('actorName', actor.actorName);
+      if (actor?.actorEmail) q.set('actorEmail', actor.actorEmail);
+      const url = `/api/inventory/items/${id}${q.toString() ? '?' + q.toString() : ''}`;
+      const res = await fetch(url, {
         method: 'DELETE',
       });
       if (!res.ok) {

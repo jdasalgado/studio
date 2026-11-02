@@ -7,6 +7,7 @@ import { BookingForm } from "@/components/venue-assistance/booking-form";
 import { usePermissionsStore } from "@studio/store";
 import { useShallow } from "zustand/react/shallow";
 import { useToast } from "@/hooks/use-toast";
+import { showSubmitSuccess, showSubmitError } from "@/hooks/use-submission-modal";
 import { LoaderCircle } from "lucide-react";
 import { createVenueBooking, createRecurringBooking } from "@/actions/venue-assistance";
 import type { CreateVenueBookingData, CreateRecurringBookingData } from "@/actions/venue-assistance";
@@ -31,19 +32,26 @@ export default function VenuePage() {
         try {
             if (isRecurring) {
                 const result = await createRecurringBooking(data as CreateRecurringBookingData);
-                toast({
-                    title: "Recurring booking created",
+                showSubmitSuccess({
+                    title: "Recurring Booking Created!",
                     description: `${result.occurrenceCount} occurrence${result.occurrenceCount !== 1 ? "s" : ""} scheduled. Ministries have been notified.`,
+                    confirmText: "View My Bookings",
+                    onConfirm: () => router.push("/venue/my"),
                 });
             } else {
                 await createVenueBooking(data as CreateVenueBookingData);
-                toast({
-                    title: "Booking submitted",
+                showSubmitSuccess({
+                    title: "Venue Booking Submitted!",
                     description: "Your booking has been submitted. Ministries have been notified.",
+                    confirmText: "View My Bookings",
+                    onConfirm: () => router.push("/venue/my"),
                 });
             }
-            router.push("/venue/my");
         } catch (err: any) {
+            showSubmitError({
+                title: "Submission Failed",
+                description: err?.message ?? "Could not submit booking. Please try again.",
+            });
             toast({
                 variant: "destructive",
                 title: "Submission failed",

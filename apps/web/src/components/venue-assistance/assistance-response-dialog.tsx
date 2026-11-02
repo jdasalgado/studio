@@ -281,6 +281,7 @@ export function AssistanceResponseDialog({
                                                 id={`qty-${item.itemId}`}
                                                 type="number"
                                                 min={1}
+                                                max={10000}
                                                 placeholder={String(item.originalQty)}
                                                 value={item.adjustedQty}
                                                 onChange={(e) =>
@@ -298,6 +299,7 @@ export function AssistanceResponseDialog({
                                             </Label>
                                             <Input
                                                 id={`desc-${item.itemId}`}
+                                                maxLength={250}
                                                 placeholder={item.originalDesc || "Optional"}
                                                 value={item.adjustedDesc}
                                                 onChange={(e) =>
@@ -328,6 +330,7 @@ export function AssistanceResponseDialog({
                         </Label>
                         <Textarea
                             id="explanation"
+                            maxLength={500}
                             placeholder="Add a note for the booking requester…"
                             value={explanation}
                             onChange={(e) => setExplanation(e.target.value)}

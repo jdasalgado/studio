@@ -21,7 +21,7 @@ import type { Worker, Role, Ministry } from "@studio/types";
 import { WorkerActivityLog } from "./worker-activity-log";
 import { assignRolesToWorker } from "@/actions/db";
 import { useToast } from "@/hooks/use-toast";
-import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail } from "@/lib/validation";
+import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail, isValidName, cleanName, MAX_LENGTHS } from "@/lib/validation";
 import Link from "next/link";
 
 interface WorkerFormProps {
@@ -186,11 +186,47 @@ export function WorkerForm({
       return;
     }
 
-    if (formData.email?.trim() && !isValidEmail(formData.email.trim())) {
+    if (!isValidName(formData.firstName.trim(), 2, MAX_LENGTHS.FIRST_NAME)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid First Name",
+        description: `First name must contain only letters and not exceed ${MAX_LENGTHS.FIRST_NAME} characters.`,
+      });
+      return;
+    }
+
+    if (!isValidName(formData.lastName.trim(), 2, MAX_LENGTHS.LAST_NAME)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Last Name",
+        description: `Last name must contain only letters and not exceed ${MAX_LENGTHS.LAST_NAME} characters.`,
+      });
+      return;
+    }
+
+    if (formData.email?.trim() && !isValidEmail(formData.email.trim(), MAX_LENGTHS.EMAIL)) {
       toast({
         variant: "destructive",
         title: "Invalid Email Address",
-        description: "Please enter a valid email format.",
+        description: `Please enter a valid email format (up to ${MAX_LENGTHS.EMAIL} characters).`,
+      });
+      return;
+    }
+
+    if (formData.address && formData.address.trim().length > MAX_LENGTHS.ADDRESS) {
+      toast({
+        variant: "destructive",
+        title: "Address Too Long",
+        description: `Address must not exceed ${MAX_LENGTHS.ADDRESS} characters.`,
+      });
+      return;
+    }
+
+    if (formData.remarks && formData.remarks.trim().length > 500) {
+      toast({
+        variant: "destructive",
+        title: "Remarks Too Long",
+        description: "Remarks must not exceed 500 characters.",
       });
       return;
     }
@@ -232,15 +268,19 @@ export function WorkerForm({
     <div className="grid gap-4 py-1">
       <div className="grid grid-cols-4 items-center gap-4">
         <Label htmlFor="firstName" className="text-right">First Name</Label>
-        <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="col-span-3" />
+        <div className="col-span-3 space-y-1">
+          <Input id="firstName" maxLength={MAX_LENGTHS.FIRST_NAME} value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: cleanName(e.target.value, MAX_LENGTHS.FIRST_NAME) })} />
+        </div>
       </div>
       <div className="grid grid-cols-4 items-center gap-4">
         <Label htmlFor="lastName" className="text-right">Last Name</Label>
-        <Input id="lastName" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} className="col-span-3" />
+        <div className="col-span-3 space-y-1">
+          <Input id="lastName" maxLength={MAX_LENGTHS.LAST_NAME} value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: cleanName(e.target.value, MAX_LENGTHS.LAST_NAME) })} />
+        </div>
       </div>
       <div className="grid grid-cols-4 items-center gap-4">
         <Label htmlFor="email" className="text-right">Email</Label>
-        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="col-span-3" />
+        <Input id="email" type="email" maxLength={MAX_LENGTHS.EMAIL} value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value.slice(0, MAX_LENGTHS.EMAIL) })} className="col-span-3" />
       </div>
       <div className="grid grid-cols-4 items-center gap-4">
         <Label htmlFor="phone" className="text-right">Phone</Label>
@@ -351,8 +391,9 @@ export function WorkerForm({
             <Label htmlFor="address" className="text-right">Address</Label>
             <Input
               id="address"
+              maxLength={MAX_LENGTHS.ADDRESS}
               value={formData.address || ""}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value.slice(0, MAX_LENGTHS.ADDRESS) })}
               className="col-span-3"
               placeholder="Full address"
             />

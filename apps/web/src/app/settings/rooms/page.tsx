@@ -1,4 +1,4 @@
-
+﻿
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -30,7 +30,7 @@ import {
 } from "@studio/ui";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@studio/ui";
 import { DeleteConfirmationDialog } from "@/components/common/delete-confirmation-dialog";
-import { MoreHorizontal, PlusCircle, LoaderCircle, MapPin, Search, Pencil, Trash2, X, Layers, ArrowLeft, Building, Building2, Users, ArrowUpDown, Sparkles } from "lucide-react";
+import { MoreHorizontal, PlusCircle, LoaderCircle, MapPin, Search, Pencil, Trash2, X, Layers, ArrowLeft, Building, Building2, Users, ArrowUpDown, Sparkles, Wrench } from "lucide-react";
 import { Label } from "@studio/ui";
 import { Input } from "@studio/ui";
 import { Checkbox } from "@studio/ui";
@@ -46,6 +46,7 @@ import {
 import type { Room, Branch, Area, VenueElement } from "@studio/types";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/use-user-role";
+import { useAuditLog } from "@/hooks/use-audit-log";
 import { useRooms } from "@/hooks/use-rooms";
 import { useVenueElements } from "@/hooks/use-venue-elements";
 import { Badge } from "@studio/ui";
@@ -56,6 +57,19 @@ import { cn } from "@/lib/utils";
 
 const BranchForm = ({ branch, onSave, onClose }: { branch: Partial<Branch> | null; onSave: (data: Partial<Branch>) => void; onClose: () => void; }) => {
     const [name, setName] = useState(branch?.name || '');
+    const [error, setError] = useState('');
+
+    const handleSubmit = () => {
+        if (!name.trim()) {
+            setError('Satellite Name is required.');
+            return;
+        }
+        if (name.trim().length > 50) {
+            setError('Satellite Name must not exceed 50 characters.');
+            return;
+        }
+        onSave({ ...branch, name: name.trim() });
+    };
 
     return (
         <div className="space-y-6">
@@ -76,6 +90,11 @@ const BranchForm = ({ branch, onSave, onClose }: { branch: Partial<Branch> | nul
             </DialogHeader>
 
             <div className="space-y-4">
+                {error && (
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+                        {error}
+                    </div>
+                )}
                 <div className="rounded-2xl border border-border/70 bg-slate-50/60 dark:bg-muted/20 p-4 sm:p-5 space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="branch-name" className="text-xs font-bold text-foreground">
@@ -84,7 +103,8 @@ const BranchForm = ({ branch, onSave, onClose }: { branch: Partial<Branch> | nul
                         <Input
                             id="branch-name"
                             value={name}
-                            onChange={e => setName(e.target.value)}
+                            maxLength={50}
+                            onChange={e => { setName(e.target.value); setError(''); }}
                             placeholder="e.g., Main Campus, North Annex"
                             className="h-10 text-xs rounded-xl border-slate-200/90 dark:border-border bg-background shadow-2xs"
                         />
@@ -97,7 +117,7 @@ const BranchForm = ({ branch, onSave, onClose }: { branch: Partial<Branch> | nul
                     Cancel
                 </Button>
                 <Button
-                    onClick={() => onSave({ ...branch, name })}
+                    onClick={handleSubmit}
                     disabled={!name.trim()}
                     className="bg-sidebar hover:bg-sidebar/90 text-white rounded-xl h-10 px-5 text-xs font-bold shadow-xs"
                 >
@@ -173,10 +193,27 @@ const AreaForm = ({ area, branches, onSave, onClose }: { area: Partial<Area> | n
         name: area?.name || '',
         branchId: area?.branchId || branches[0]?.id || ''
     });
+    const [error, setError] = useState('');
+
+    const handleSubmit = () => {
+        if (!formData.name?.trim()) {
+            setError('Area Name is required.');
+            return;
+        }
+        if (formData.name.trim().length > 50) {
+            setError('Area Name must not exceed 50 characters.');
+            return;
+        }
+        if (!formData.branchId) {
+            setError('Please select a satellite campus.');
+            return;
+        }
+        onSave({ ...formData, name: formData.name.trim() });
+    };
 
     return (
         <div className="flex flex-col h-full max-h-[92vh] overflow-hidden">
-            {/* ── MODAL HEADER ── */}
+            {/* ΓöÇΓöÇ MODAL HEADER ΓöÇΓöÇ */}
             <div className="p-5 pb-4 border-b border-border/70 bg-card/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3.5 min-w-0 flex-1">
@@ -206,8 +243,13 @@ const AreaForm = ({ area, branches, onSave, onClose }: { area: Partial<Area> | n
                 </div>
             </div>
 
-            {/* ── SCROLLABLE BODY ── */}
+            {/* ΓöÇΓöÇ SCROLLABLE BODY ΓöÇΓöÇ */}
             <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+                {error && (
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+                        {error}
+                    </div>
+                )}
                 <div className="rounded-2xl border border-border/70 bg-slate-50/60 dark:bg-muted/20 p-4 sm:p-5 space-y-4 shadow-2xs">
                     <div className="space-y-1.5">
                         <Label htmlFor="area-name" className="text-xs font-bold text-foreground">
@@ -216,7 +258,8 @@ const AreaForm = ({ area, branches, onSave, onClose }: { area: Partial<Area> | n
                         <Input
                             id="area-name"
                             value={formData.name}
-                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            maxLength={50}
+                            onChange={e => { setFormData({ ...formData, name: e.target.value }); setError(''); }}
                             placeholder="e.g., Second Floor, Youth Wing"
                             className="h-10 text-xs rounded-xl border-slate-200/90 dark:border-border bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
                         />
@@ -224,7 +267,7 @@ const AreaForm = ({ area, branches, onSave, onClose }: { area: Partial<Area> | n
                 </div>
             </div>
 
-            {/* ── FOOTER ACTIONS ── */}
+            {/* ΓöÇΓöÇ FOOTER ACTIONS ΓöÇΓöÇ */}
             <div className="p-4 sm:p-5 border-t border-border/70 bg-card/80 backdrop-blur-md flex items-center justify-end gap-2.5 shrink-0">
                 <Button
                     type="button"
@@ -427,6 +470,7 @@ const AreasTab = ({ areas, branches, rooms, isLoading, onAdd, onEdit, onDelete }
 
 
 const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { room: Partial<Room> | null; areas: Area[]; branches: Branch[]; venueElements: VenueElement[]; onSave: (data: Partial<Room>) => void; onClose: () => void; }) => {
+    const [error, setError] = useState('');
     const [formData, setFormData] = useState<Partial<Room>>({
         id: room?.id,
         name: room?.name || '',
@@ -434,6 +478,9 @@ const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { r
         elements: room?.elements || [],
         areaId: room?.areaId || '',
         weight: room?.weight || 0,
+        status: room?.status || 'Active',
+        numChairs: room?.numChairs ?? null,
+        numTables: room?.numTables ?? null,
     });
 
     const handleElementChange = (elementId: string, checked: boolean) => {
@@ -463,7 +510,7 @@ const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { r
 
     return (
         <div className="flex flex-col h-full max-h-[92vh] overflow-hidden">
-            {/* ── MODAL HEADER ── */}
+            {/* ΓöÇΓöÇ MODAL HEADER ΓöÇΓöÇ */}
             <div className="p-5 pb-4 border-b border-border/70 bg-card/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3.5 min-w-0 flex-1">
@@ -493,8 +540,13 @@ const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { r
                 </div>
             </div>
 
-            {/* ── SCROLLABLE BODY ── */}
+            {/* ΓöÇΓöÇ SCROLLABLE BODY ΓöÇΓöÇ */}
             <div className="p-5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
+                {error && (
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+                        {error}
+                    </div>
+                )}
                 {/* 1. Basic Details Card */}
                 <div className="rounded-2xl border border-border/70 bg-slate-50/60 dark:bg-muted/20 p-4 sm:p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sidebar dark:text-sky-400">
@@ -510,6 +562,7 @@ const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { r
                             id="room-name"
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            maxLength={50}
                             placeholder="e.g., Studio, Conference Room A, Main Sanctuary"
                             className="h-10 text-xs rounded-xl border-slate-200/90 dark:border-border bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
                         />
@@ -550,11 +603,76 @@ const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { r
                             id="room-capacity"
                             type="number"
                             min={0}
+                            max={5000}
                             value={formData.capacity === 0 ? '' : formData.capacity}
                             onChange={e => setFormData({ ...formData, capacity: parseInt(e.target.value, 10) || 0 })}
                             placeholder="e.g., 50"
                             className="h-10 text-xs rounded-xl border-slate-200/90 dark:border-border bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
                         />
+                    </div>
+
+                    {/* Chairs & Tables Row */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="room-chairs" className="text-xs font-bold text-foreground">
+                                No. of Chairs
+                            </Label>
+                            <Input
+                                id="room-chairs"
+                                type="number"
+                                min={0}
+                                max={5000}
+                                value={formData.numChairs == null ? '' : formData.numChairs}
+                                onChange={e => setFormData({ ...formData, numChairs: e.target.value === '' ? null : parseInt(e.target.value, 10) || 0 })}
+                                placeholder="e.g., 30"
+                                className="h-10 text-xs rounded-xl border-slate-200/90 dark:border-border bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="room-tables" className="text-xs font-bold text-foreground">
+                                No. of Tables
+                            </Label>
+                            <Input
+                                id="room-tables"
+                                type="number"
+                                min={0}
+                                max={1000}
+                                value={formData.numTables == null ? '' : formData.numTables}
+                                onChange={e => setFormData({ ...formData, numTables: e.target.value === '' ? null : parseInt(e.target.value, 10) || 0 })}
+                                placeholder="e.g., 10"
+                                className="h-10 text-xs rounded-xl border-slate-200/90 dark:border-border bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Room Status */}
+                    <div className="space-y-1.5">
+                        <Label htmlFor="room-status" className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>Room Status</span>
+                        </Label>
+                        <Select
+                            value={formData.status || 'Active'}
+                            onValueChange={value => setFormData({ ...formData, status: value as 'Active' | 'Maintenance' })}
+                        >
+                            <SelectTrigger id="room-status" className="h-10 text-xs rounded-xl border-slate-200/90 dark:border-border bg-background shadow-2xs font-medium focus:ring-1 focus:ring-sidebar/40 focus:border-sidebar cursor-pointer">
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl shadow-xl border-border/80">
+                                <SelectItem value="Active" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                                        Active
+                                    </span>
+                                </SelectItem>
+                                <SelectItem value="Maintenance" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                                        Maintenance
+                                    </span>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
 
@@ -609,7 +727,7 @@ const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { r
                 </div>
             </div>
 
-            {/* ── FOOTER ACTIONS ── */}
+            {/* ΓöÇΓöÇ FOOTER ACTIONS ΓöÇΓöÇ */}
             <div className="p-4 sm:p-5 border-t border-border/70 bg-card/80 backdrop-blur-md flex items-center justify-end gap-2.5 shrink-0">
                 <Button
                     type="button"
@@ -620,8 +738,33 @@ const RoomForm = ({ room, areas, branches, venueElements, onSave, onClose }: { r
                     Cancel
                 </Button>
                 <Button
-                    onClick={() => onSave(formData)}
-                    disabled={!formData.name?.trim() || !formData.areaId}
+                    onClick={() => {
+                    if (!formData.name?.trim()) {
+                        setError('Room Name is required.');
+                        return;
+                    }
+                    if (formData.name.trim().length > 50) {
+                        setError('Room Name must not exceed 50 characters.');
+                        return;
+                    }
+                    if (!formData.areaId) {
+                        setError('Area / Location is required. Please select an area.');
+                        return;
+                    }
+                    if (formData.capacity !== undefined && formData.capacity > 5000) {
+                        setError('Capacity cannot exceed 5,000.');
+                        return;
+                    }
+                    if (formData.numChairs !== null && formData.numChairs !== undefined && formData.numChairs > 5000) {
+                        setError('Number of chairs cannot exceed 5,000.');
+                        return;
+                    }
+                    if (formData.numTables !== null && formData.numTables !== undefined && formData.numTables > 1000) {
+                        setError('Number of tables cannot exceed 1,000.');
+                        return;
+                    }
+                    onSave({ ...formData, name: formData.name.trim() });
+                }}
                     className="bg-sidebar hover:bg-sidebar/90 text-white rounded-xl h-10 px-6 text-xs font-bold shadow-xs transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
                 >
                     {room ? 'Update Room' : 'Create Room'}
@@ -652,13 +795,17 @@ const RoomsTab = ({ rooms, areas, branches, venueElements, isLoading, onAdd, onE
         });
     }, [areas]);
 
-    const filtered = rooms.filter(room => {
-        const matchesSearch = !search || room.name.toLowerCase().includes(search.toLowerCase());
-        const matchesArea = areaFilter === 'all' || room.areaId === areaFilter;
-        const roomStatus = (room as any).status || 'Active';
-        const matchesStatus = statusFilter === 'all' || roomStatus === statusFilter;
-        return matchesSearch && matchesArea && matchesStatus;
-    });
+    const filtered = useMemo(() => {
+        return rooms
+            .filter(room => {
+                const matchesSearch = !search || room.name.toLowerCase().includes(search.toLowerCase());
+                const matchesArea = areaFilter === 'all' || room.areaId === areaFilter;
+                const roomStatus = room.status || 'Active';
+                const matchesStatus = statusFilter === 'all' || roomStatus === statusFilter;
+                return matchesSearch && matchesArea && matchesStatus;
+            })
+            .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+    }, [rooms, search, areaFilter, statusFilter]);
 
     return (
         <div className="bg-white dark:bg-card rounded-2xl border border-border/60 shadow-card-dark p-5 sm:p-6 overflow-hidden flex flex-col gap-4">
@@ -733,7 +880,7 @@ const RoomsTab = ({ rooms, areas, branches, venueElements, isLoading, onAdd, onE
 
             {/* Table / Mobile Cards Container */}
             <div className="border border-border/60 rounded-2xl overflow-hidden flex flex-col bg-card mt-1">
-                {/* ── Mobile Card View (md:hidden) ── */}
+                {/* ΓöÇΓöÇ Mobile Card View (md:hidden) ΓöÇΓöÇ */}
                 <div className="md:hidden p-3 space-y-3 bg-muted/15 dark:bg-muted/10">
                     {isLoading ? (
                         <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
@@ -746,7 +893,7 @@ const RoomsTab = ({ rooms, areas, branches, venueElements, isLoading, onAdd, onE
                         </div>
                     ) : filtered.map(room => {
                         const { areaName, branchName } = getAreaAndBranch(room.areaId);
-                        const status = (room as any).status || 'Active';
+                        const status = room.status || 'Active';
                         const isMaintenance = status === 'Maintenance';
                         return (
                             <div
@@ -830,32 +977,48 @@ const RoomsTab = ({ rooms, areas, branches, venueElements, isLoading, onAdd, onE
                                             <span>{room.capacity} seats</span>
                                         </span>
                                     </div>
+                                    {/* Chairs / Tables */}
+                                    {(room.numChairs != null || room.numTables != null) && (
+                                        <div className="flex items-center gap-2 pt-2 flex-wrap">
+                                            {room.numChairs != null && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 dark:bg-muted/40 dark:text-slate-300 border border-slate-200 dark:border-border">
+                                                    <Users className="h-3 w-3 text-slate-400 shrink-0" />{room.numChairs} chairs
+                                                </span>
+                                            )}
+                                            {room.numTables != null && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 dark:bg-muted/40 dark:text-slate-300 border border-slate-200 dark:border-border">
+                                                    <Layers className="h-3 w-3 text-slate-400 shrink-0" />{room.numTables} tables
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
 
-                {/* ── Desktop Table View (hidden md:block) ── */}
+                {/* ΓöÇΓöÇ Desktop Table View (hidden md:block) ΓöÇΓöÇ */}
                 <div className="hidden md:block overflow-x-auto">
                     <Table className="min-w-[620px]">
                         <TableHeader>
                             <TableRow className="bg-sidebar hover:bg-sidebar border-b border-sidebar-border/40">
                                 <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-left w-[28%]">NAME</TableHead>
                                 <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-left w-[24%]">LOCATION</TableHead>
-                                <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-center w-[16%]">CAPACITY</TableHead>
-                                <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-center w-[16%]">STATUS</TableHead>
-                                <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-center w-[16%]">ACTIONS</TableHead>
+                                <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-center w-[13%]">CAPACITY</TableHead>
+                                <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-center w-[16%]">CHAIRS / TABLES</TableHead>
+                                <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-center w-[13%]">STATUS</TableHead>
+                                <TableHead className="bg-sidebar font-bold text-white text-[11px] uppercase tracking-wider h-11 px-5 text-center w-[12%]">ACTIONS</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={5} className="py-14 text-center"><LoaderCircle className="mx-auto h-6 w-6 animate-spin text-primary" /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="py-14 text-center"><LoaderCircle className="mx-auto h-6 w-6 animate-spin text-primary" /></TableCell></TableRow>
                             ) : filtered.length === 0 ? (
-                                <TableRow><TableCell colSpan={5} className="py-14 text-center text-sm text-muted-foreground">No rooms found.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="py-14 text-center text-sm text-muted-foreground">No rooms found.</TableCell></TableRow>
                             ) : filtered.map(room => {
                                 const { areaName, branchName } = getAreaAndBranch(room.areaId);
-                                const status = (room as any).status || 'Active';
+                                const status = room.status || 'Active';
                                 const isMaintenance = status === 'Maintenance';
                                 return (
                                     <TableRow key={room.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
@@ -879,6 +1042,23 @@ const RoomsTab = ({ rooms, areas, branches, venueElements, isLoading, onAdd, onE
                                             <span className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shadow-2xs">
                                                 {room.capacity} seats
                                             </span>
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3.5 text-center align-middle whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-2 flex-wrap">
+                                                {room.numChairs != null ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 dark:bg-muted/40 dark:text-slate-300 border border-slate-200 dark:border-border">
+                                                        <Users className="h-3 w-3 text-slate-400 shrink-0" />{room.numChairs}c
+                                                    </span>
+                                                ) : null}
+                                                {room.numTables != null ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 dark:bg-muted/40 dark:text-slate-300 border border-slate-200 dark:border-border">
+                                                        <Layers className="h-3 w-3 text-slate-400 shrink-0" />{room.numTables}t
+                                                    </span>
+                                                ) : null}
+                                                {room.numChairs == null && room.numTables == null ? (
+                                                    <span className="text-xs text-muted-foreground">—</span>
+                                                ) : null}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="px-5 py-3.5 text-center align-middle">
                                             <Badge
@@ -935,6 +1115,7 @@ const RoomsTab = ({ rooms, areas, branches, venueElements, isLoading, onAdd, onE
 
 export default function RoomManagementPage() {
     const { canManageFacilities, isLoading: isRoleLoading } = useUserRole();
+    const { logAction } = useAuditLog();
     const { toast } = useToast();
 
     // SQL Hooks
@@ -966,16 +1147,31 @@ export default function RoomManagementPage() {
     const handleSaveBranch = async (data: Partial<Branch>) => {
         try {
             if (data.id) {
+                const existing = branches?.find(b => b.id === data.id);
                 await updateBranch({ id: data.id, data });
+                await logAction(
+                    'Updated Campus',
+                    'Facilities',
+                    `Updated satellite campus "${data.name || existing?.name}"`,
+                    data.id,
+                    data.name || existing?.name
+                );
                 toast({ title: 'Satellite Updated' });
             } else {
                 const customId = `B-${data.name!.trim().replace(/\s+/g, ' ')}`;
                 await createBranch({ ...data, id: customId });
+                await logAction(
+                    'Created Campus',
+                    'Facilities',
+                    `Created satellite campus "${data.name}"`,
+                    customId,
+                    data.name
+                );
                 toast({ title: 'Satellite Added' });
             }
             setIsBranchSheetOpen(false);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save satellite.' });
+            toast({ variant: 'destructive', title: 'Save Failed', description: (error as any)?.message || 'Could not save satellite.' });
         }
     };
 
@@ -983,6 +1179,13 @@ export default function RoomManagementPage() {
         if (!branchToDelete) return;
         try {
             await deleteBranch(branchToDelete.id);
+            await logAction(
+                'Deleted Campus',
+                'Facilities',
+                `Deleted satellite campus "${branchToDelete.name}" (${branchToDelete.id})`,
+                branchToDelete.id,
+                branchToDelete.name
+            );
             toast({ title: 'Satellite Deleted' });
             setBranchToDelete(null);
         } catch (error) {
@@ -994,7 +1197,15 @@ export default function RoomManagementPage() {
     const handleSaveArea = async (data: Partial<Area>) => {
         try {
             if (data.id) {
+                const existing = areas?.find(a => a.id === data.id);
                 await updateArea({ id: data.id, data });
+                await logAction(
+                    'Updated Area',
+                    'Facilities',
+                    `Updated facility area "${data.name || existing?.name}"`,
+                    data.id,
+                    data.name || existing?.name
+                );
                 toast({ title: 'Area Updated' });
             } else {
                 if (!data.name || !data.branchId) {
@@ -1010,20 +1221,32 @@ export default function RoomManagementPage() {
                     id: customId,
                     areaId: customId
                 });
+                await logAction(
+                    'Created Area',
+                    'Facilities',
+                    `Created facility area "${data.name}" in campus "${branchName}"`,
+                    customId,
+                    data.name
+                );
                 toast({ title: 'Area Added' });
             }
             setIsAreaSheetOpen(false);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save area.' });
+            toast({ variant: 'destructive', title: 'Save Failed', description: (error as any)?.message || 'Could not save area.' });
         }
     };
-
-
 
     const handleDeleteArea = async () => {
         if (!areaToDelete) return;
         try {
             await deleteArea(areaToDelete.id);
+            await logAction(
+                'Deleted Area',
+                'Facilities',
+                `Deleted facility area "${areaToDelete.name}" (${areaToDelete.id})`,
+                areaToDelete.id,
+                areaToDelete.name
+            );
             toast({ title: 'Area Deleted' });
             setAreaToDelete(null);
         } catch (error) {
@@ -1031,13 +1254,32 @@ export default function RoomManagementPage() {
         }
     };
 
-
-
-
     const handleSaveRoom = async (data: Partial<Room>) => {
         try {
             if (data.id) {
+                const existingRoom = rooms?.find(r => r.id === data.id);
+                const area = areas?.find(a => a.id === (data.areaId || existingRoom?.areaId));
+                const areaName = area?.name || 'Area';
+
                 await updateRoom({ id: data.id, data });
+
+                let actionName = 'Updated Room';
+                let changeDesc = `Updated room "${data.name || existingRoom?.name}"`;
+                if (existingRoom && data.status && existingRoom.status !== data.status) {
+                    actionName = 'Updated Room Status';
+                    changeDesc = `Changed room "${data.name || existingRoom.name}" status from "${existingRoom.status || 'Active'}" to "${data.status}"`;
+                } else if (existingRoom && data.capacity !== undefined && existingRoom.capacity !== data.capacity) {
+                    changeDesc = `Updated room "${data.name || existingRoom.name}" capacity to ${data.capacity} seats`;
+                }
+
+                await logAction(
+                    actionName,
+                    'Facilities',
+                    `${changeDesc} (${areaName}, Capacity: ${data.capacity ?? existingRoom?.capacity ?? 0})`,
+                    data.id,
+                    data.name || existingRoom?.name || 'Room'
+                );
+
                 toast({ title: 'Room Updated' });
             } else {
                 const area = areas?.find(a => a.id === data.areaId);
@@ -1049,11 +1291,20 @@ export default function RoomManagementPage() {
                     ...data,
                     id: customId
                 });
+
+                await logAction(
+                    'Created Room',
+                    'Facilities',
+                    `Created new room "${data.name}" in area "${areaName}" (Status: ${data.status || 'Active'}, Capacity: ${data.capacity || 0})`,
+                    customId,
+                    data.name
+                );
+
                 toast({ title: 'Room Added' });
             }
             setIsRoomSheetOpen(false);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save room.' });
+            toast({ variant: 'destructive', title: 'Save Failed', description: (error as any)?.message || 'Could not save room.' });
         }
     };
 
@@ -1061,6 +1312,13 @@ export default function RoomManagementPage() {
         if (!roomToDelete) return;
         try {
             await deleteRoom(roomToDelete.id);
+            await logAction(
+                'Deleted Room',
+                'Facilities',
+                `Deleted room "${roomToDelete.name}" (${roomToDelete.id})`,
+                roomToDelete.id,
+                roomToDelete.name
+            );
             toast({ title: 'Room Deleted' });
             setRoomToDelete(null);
         } catch (error) {
@@ -1170,6 +1428,7 @@ export default function RoomManagementPage() {
             <Dialog open={isRoomSheetOpen} onOpenChange={setIsRoomSheetOpen}>
                 <DialogContent className="sm:max-w-xl max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-3xl border border-border/80 shadow-2xl bg-card [&>button:last-child]:hidden">
                     <RoomForm
+                        key={selectedRoom?.id || 'new'}
                         room={selectedRoom}
                         areas={areas || []}
                         branches={branches || []}

@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
       checkoutCondition,
       checkoutChecklist,
       quantity = 1,
+      actorId,
+      actorName,
+      actorEmail,
     } = body;
 
     if (!itemId || !borrowerId) {
@@ -142,6 +145,23 @@ export async function POST(req: NextRequest) {
 
       return mainBorrowing;
     });
+
+    try {
+      await prisma.transactionLog.create({
+        data: {
+          userId: actorId || borrowerId || null,
+          userName: actorName || borrowerName || 'Inventory Staff',
+          userEmail: actorEmail || null,
+          action: 'Equipment Borrow / Checkout',
+          module: 'Inventory',
+          details: `Checked out item "${item.name}" (${numQty} ${item.unit || 'pcs'}) to ${borrowerName || 'Worker'}. Remaining stock: ${Math.max(0, item.quantity - numQty)}. Due: ${dueDate ? new Date(dueDate).toLocaleDateString() : 'None'}. Notes: ${checkoutNotes || 'None'}.`,
+          targetId: item.id,
+          targetName: item.name,
+        },
+      });
+    } catch (e) {
+      console.warn('Failed to record transaction log for checkout:', e);
+    }
 
     return NextResponse.json(borrowing);
   } catch (error: any) {

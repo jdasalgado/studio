@@ -6,7 +6,6 @@ import {
   Plus,
   QrCode,
   Calendar,
-  User,
   Clock,
   CheckCircle2,
   AlertTriangle,
@@ -16,18 +15,10 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   RefreshCw,
-  FileSpreadsheet,
-  Download,
-  Filter,
   X,
   Eye,
   Info,
-  ArrowLeftRight,
-  SlidersHorizontal,
-  Check,
   ShieldCheck,
-  Tag,
-  AlertCircle,
   MoreHorizontal,
   Camera,
   ChevronDown,
@@ -73,6 +64,8 @@ import {
 } from '@studio/ui';
 import { useInventory, type InventoryBorrowing } from '@/hooks/use-inventory';
 import { useWorkers } from '@/hooks/use-workers';
+import { useUserRole } from '@/hooks/use-user-role';
+import { useAuthStore } from '@studio/store';
 import { useToast } from '@/hooks/use-toast';
 import { exportToExcel } from '@/lib/export-excel';
 import { ExportConfirmDialog } from '@/components/common/export-confirm-dialog';
@@ -84,6 +77,8 @@ export function BorrowingsPanel() {
   const { borrowings, totalBorrowings, loading, fetchBorrowings, items, fetchItems } = useInventory();
   const { workers } = useWorkers({ limit: 99999 });
   const { toast } = useToast();
+  const { workerProfile } = useUserRole();
+  const { user } = useAuthStore();
 
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -241,8 +236,6 @@ export function BorrowingsPanel() {
       setIsSavingDetails(false);
     }
   };
-
-  // Checklist Templates
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
 
   // Borrowing Transaction QR Modal
@@ -319,11 +312,27 @@ export function BorrowingsPanel() {
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!checkoutItemId || !checkoutWorkerId) {
+    if (!checkoutItemId) {
       toast({
         variant: 'destructive',
-        title: 'Missing information',
-        description: 'Please select both an item and a borrower.',
+        title: 'Missing Item',
+        description: 'Please select an item to checkout.',
+      });
+      return;
+    }
+    if (!checkoutWorkerId) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Borrower',
+        description: 'Please select a worker / borrower.',
+      });
+      return;
+    }
+    if (checkoutNotes && checkoutNotes.length > 500) {
+      toast({
+        variant: 'destructive',
+        title: 'Notes Too Long',
+        description: 'Notes must not exceed 500 characters.',
       });
       return;
     }
@@ -379,6 +388,14 @@ export function BorrowingsPanel() {
   const handleReturnSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBorrowing) return;
+    if (returnNotes && returnNotes.length > 500) {
+      toast({
+        variant: 'destructive',
+        title: 'Notes Too Long',
+        description: 'Inspection notes must not exceed 500 characters.',
+      });
+      return;
+    }
 
     const isDamagedItem = returnCondition === 'Damaged';
     if (isDamagedItem && !returnDamagePhoto) {
@@ -410,6 +427,9 @@ export function BorrowingsPanel() {
           returnChecklist,
           damaged: isDamagedItem,
           returnPhotos: returnDamagePhoto ? [returnDamagePhoto] : [],
+          actorId: workerProfile?.id || user?.id || null,
+          actorName: workerProfile ? `${workerProfile.firstName} ${workerProfile.lastName}`.trim() : (user?.displayName || user?.email || 'Staff'),
+          actorEmail: user?.email || workerProfile?.email || null,
         }),
       });
 
@@ -1323,6 +1343,7 @@ export function BorrowingsPanel() {
                 <Label className="text-xs font-bold text-foreground">Notes / Purpose</Label>
                 <Input
                   value={checkoutNotes}
+                  maxLength={500}
                   onChange={(e) => setCheckoutNotes(e.target.value)}
                   placeholder="e.g. Sunday 2nd Service Audio setup / Youth Camp"
                   className="h-9 text-xs rounded-xl"
@@ -1597,6 +1618,7 @@ export function BorrowingsPanel() {
                   <Label className="text-xs font-bold text-foreground">Inspection Notes</Label>
                   <Input
                     value={returnNotes}
+                    maxLength={500}
                     onChange={(e) => setReturnNotes(e.target.value)}
                     placeholder="e.g. Returned clean, fully functional, battery at 90%"
                     className="h-9 text-xs rounded-xl"
@@ -1826,6 +1848,7 @@ export function BorrowingsPanel() {
                         <Label className="text-xs font-semibold">Maintenance / Replacement Notes</Label>
                         <Textarea
                           value={editReturnNotes}
+                          maxLength={1000}
                           onChange={(e) => setEditReturnNotes(e.target.value)}
                           placeholder="Ilagay dito ang mga parts na nadamage, naayos, o pinalitan (e.g., Napalitan ang camera lens, naayos ang charging port)..."
                           className="text-xs rounded-xl min-h-[75px] bg-background resize-none leading-relaxed"

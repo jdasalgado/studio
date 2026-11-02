@@ -45,11 +45,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@studio/database";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { cleanName, isValidName, MAX_LENGTHS } from "@/lib/validation";
 import { FontSizeSlider } from "@/components/settings/font-size-slider";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { requestPasswordReset } from "@/actions/auth";
 import { useUserRole } from "@/hooks/use-user-role";
-import { updateWorkerProfileSettings, getEmailChangeStatus } from "@/actions/db";
+import { updateWorkerProfileSettings, getEmailChangeStatus, recordAuthActivity } from "@/actions/db";
 
 type SettingTab = "profile" | "appearance" | "password" | "security" | "support" | "report";
 
@@ -100,14 +101,14 @@ function MySettingsContent() {
   };
 
   const handleFirstNameChange = (val: string) => {
-    setFirstName(val);
+    setFirstName(cleanName(val, MAX_LENGTHS.FIRST_NAME));
     if (errors.firstName) {
       setErrors((prev) => ({ ...prev, firstName: undefined }));
     }
   };
 
   const handleLastNameChange = (val: string) => {
-    setLastName(val);
+    setLastName(cleanName(val, MAX_LENGTHS.LAST_NAME));
     if (errors.lastName) {
       setErrors((prev) => ({ ...prev, lastName: undefined }));
     }
@@ -131,12 +132,20 @@ function MySettingsContent() {
       newErrors.firstName = "First name is required.";
     } else if (trimmedFirst.length < 2) {
       newErrors.firstName = "First name must be at least 2 characters.";
+    } else if (trimmedFirst.length > MAX_LENGTHS.FIRST_NAME) {
+      newErrors.firstName = `First name cannot exceed ${MAX_LENGTHS.FIRST_NAME} letters.`;
+    } else if (!isValidName(trimmedFirst, 2, MAX_LENGTHS.FIRST_NAME)) {
+      newErrors.firstName = "First name must contain only letters.";
     }
 
     if (!trimmedLast) {
       newErrors.lastName = "Last name is required.";
     } else if (trimmedLast.length < 2) {
       newErrors.lastName = "Last name must be at least 2 characters.";
+    } else if (trimmedLast.length > MAX_LENGTHS.LAST_NAME) {
+      newErrors.lastName = `Last name cannot exceed ${MAX_LENGTHS.LAST_NAME} letters.`;
+    } else if (!isValidName(trimmedLast, 2, MAX_LENGTHS.LAST_NAME)) {
+      newErrors.lastName = "Last name must contain only letters.";
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -309,6 +318,19 @@ function MySettingsContent() {
 
   const handleLogoutAllDevices = async () => {
     try {
+      if (typeof window !== 'undefined' && user?.id) {
+        sessionStorage.removeItem(`cog_session_login_${user.id}`);
+      }
+      try {
+        await recordAuthActivity("User Logout", {
+          userId: user?.id || null,
+          email: user?.email || null,
+          name: `${firstName} ${lastName}`.trim() || user?.email || 'User',
+          details: "User signed out from all devices",
+        });
+      } catch (logErr) {
+        console.warn('Failed to record logout all devices:', logErr);
+      }
       await supabase.auth.signOut({ scope: "global" });
       toast({
         title: "Logged out from all devices",
@@ -397,6 +419,7 @@ function MySettingsContent() {
                     </Label>
                     <Input
                       id="firstName"
+                      maxLength={MAX_LENGTHS.FIRST_NAME}
                       value={firstName}
                       onChange={(e) => handleFirstNameChange(e.target.value)}
                       placeholder="First Name"
@@ -420,6 +443,7 @@ function MySettingsContent() {
                     </Label>
                     <Input
                       id="lastName"
+                      maxLength={MAX_LENGTHS.LAST_NAME}
                       value={lastName}
                       onChange={(e) => handleLastNameChange(e.target.value)}
                       placeholder="Last Name"

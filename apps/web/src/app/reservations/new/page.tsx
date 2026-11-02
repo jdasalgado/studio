@@ -27,6 +27,8 @@ import {
   Clock,
   ArrowRight,
   RotateCcw,
+  Wrench,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,8 @@ import {
   submitRoomReservation,
 } from "@/actions/db";
 import { useToast } from "@/hooks/use-toast";
+import { isValidEmail, isValidName, cleanName, MAX_LENGTHS } from "@/lib/validation";
+import { showSubmitSuccess, showSubmitError } from "@/hooks/use-submission-modal";
 import type { Room, Area, Ministry, VenueElement } from "@studio/types";
 
 export default function NewReservationPage() {
@@ -317,6 +321,24 @@ export default function NewReservationPage() {
       return;
     }
 
+    if (requesterName.trim().length > MAX_LENGTHS.NAME) {
+      toast({
+        variant: "destructive",
+        title: "Name Too Long",
+        description: `Requester name must not exceed ${MAX_LENGTHS.NAME} characters.`,
+      });
+      return;
+    }
+
+    if (!isValidName(requesterName.trim(), 2, MAX_LENGTHS.NAME)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Requester Name",
+        description: `Please enter a valid requester name (letters only, up to ${MAX_LENGTHS.NAME} characters).`,
+      });
+      return;
+    }
+
     const effectiveMinistryId =
       ministryId ||
       userMinistry?.id ||
@@ -343,11 +365,29 @@ export default function NewReservationPage() {
       return;
     }
 
+    if (!isValidEmail(email.trim(), MAX_LENGTHS.EMAIL)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email Address",
+        description: `Please provide a valid email address (up to ${MAX_LENGTHS.EMAIL} characters).`,
+      });
+      return;
+    }
+
     if (!purpose.trim()) {
       toast({
         variant: "destructive",
         title: "Missing Purpose",
         description: "Please provide the purpose of your reservation.",
+      });
+      return;
+    }
+
+    if (purpose.trim().length > MAX_LENGTHS.PURPOSE) {
+      toast({
+        variant: "destructive",
+        title: "Purpose Too Long",
+        description: `Purpose must not exceed ${MAX_LENGTHS.PURPOSE} characters.`,
       });
       return;
     }
@@ -393,6 +433,15 @@ export default function NewReservationPage() {
         variant: "destructive",
         title: "Missing Room",
         description: "Please select a floor and room.",
+      });
+      return;
+    }
+
+    if (selectedRoom?.status === "Maintenance") {
+      toast({
+        variant: "destructive",
+        title: "Room Under Maintenance",
+        description: `Room "${selectedRoom.name}" is currently under maintenance and cannot be reserved. Please select another room.`,
       });
       return;
     }
@@ -548,12 +597,12 @@ export default function NewReservationPage() {
       });
 
       if (res && (!res.success || (res as any).error)) {
-        toast({
-          variant: "destructive",
-          title: "Submission Failed",
-          description:
-            (res as any).error ||
-            "This room is already reserved for the selected time slot.",
+        const errorDesc =
+          (res as any).error ||
+          "This room is already reserved for the selected time slot.";
+        showSubmitError({
+          title: "Reservation Request Failed",
+          description: errorDesc,
         });
         return;
       }
@@ -575,6 +624,24 @@ export default function NewReservationPage() {
 
         setSubmittedStatus(initialStatus);
         setIsSubmitted(true);
+        showSubmitSuccess({
+          title: "Room Reservation Request Submitted!",
+          description:
+            initialStatus === "Pending Ministry Approval"
+              ? "Your room reservation request has been submitted successfully and is now waiting for Ministry Head review."
+              : "Your room reservation request has been submitted successfully and is now waiting for administrative review.",
+          referenceId: generatedRequestId,
+          confirmText: "View My Reservations",
+          onConfirm: () => router.push("/reservations/my"),
+          secondaryText: "Submit Another",
+          onSecondary: () => {
+            setIsSubmitted(false);
+            setPurpose("");
+            setStartTime("");
+            setEndTime("");
+            setGeneratedRequestId(`REQ-${Math.floor(1000 + Math.random() * 9000)}`);
+          },
+        });
       }
     } catch (error: any) {
       console.error("Error submitting reservation:", error);
@@ -788,11 +855,14 @@ export default function NewReservationPage() {
                 </label>
                 <Input
                   required
+                  maxLength={MAX_LENGTHS.NAME}
                   value={requesterName}
-                  onChange={(e) => setRequesterName(e.target.value)}
+                  onChange={(e) => setRequesterName(cleanName(e.target.value, MAX_LENGTHS.NAME))}
                   placeholder="System Admin"
                   className="bg-background dark:bg-muted/30 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 border border-slate-200/90 dark:border-border rounded-xl h-10 text-xs font-normal shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                 />
+                <div className="flex justify-end">
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -815,8 +885,9 @@ export default function NewReservationPage() {
               <Input
                 type="email"
                 required
+                maxLength={MAX_LENGTHS.EMAIL}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value.slice(0, MAX_LENGTHS.EMAIL))}
                 placeholder="admin@gmail.com"
                 className="bg-background dark:bg-muted/30 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 border border-slate-200/90 dark:border-border rounded-xl h-10 text-xs font-normal shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
               />
@@ -829,11 +900,14 @@ export default function NewReservationPage() {
               </label>
               <Textarea
                 required
+                maxLength={MAX_LENGTHS.PURPOSE}
                 value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
+                onChange={(e) => setPurpose(e.target.value.slice(0, MAX_LENGTHS.PURPOSE))}
                 placeholder="Describe the event or meeting...."
                 className="bg-background dark:bg-muted/30 border border-slate-200/90 dark:border-border rounded-xl min-h-[110px] p-3 text-xs leading-relaxed font-normal text-slate-800 dark:text-slate-100 placeholder:text-slate-400 shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
               />
+              <div className="flex justify-end">
+              </div>
             </div>
 
             {/* Row 5: Floor / Room */}
@@ -857,20 +931,47 @@ export default function NewReservationPage() {
                         <SelectLabel className="text-xs font-bold text-gray-500 dark:text-gray-400">
                           {area.name}
                         </SelectLabel>
-                        {areaRooms.map((room) => (
-                          <SelectItem
-                            key={room.id}
-                            value={room.id}
-                            className="text-xs"
-                          >
-                            {area.name} – {room.name} (Cap: {room.capacity})
-                          </SelectItem>
-                        ))}
+                        {areaRooms.map((room) => {
+                          const isUnderMaintenance = room.status === "Maintenance";
+                          return (
+                            <SelectItem
+                              key={room.id}
+                              value={room.id}
+                              disabled={isUnderMaintenance}
+                              className={cn(
+                                "text-xs",
+                                isUnderMaintenance && "opacity-60 cursor-not-allowed bg-amber-50/40 dark:bg-amber-950/20"
+                              )}
+                            >
+                              <div className="flex items-center justify-between w-full gap-2">
+                                <span className={cn(isUnderMaintenance && "text-muted-foreground")}>
+                                  {area.name} – {room.name} (Cap: {room.capacity})
+                                </span>
+                                {isUnderMaintenance && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                                    Maintenance
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectGroup>
                     );
                   })}
                 </SelectContent>
               </Select>
+              {selectedRoom?.status === "Maintenance" && (
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs shadow-2xs">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Room Under Maintenance</p>
+                    <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                      <strong>{selectedRoom.name}</strong> is temporarily unavailable for reservations due to ongoing maintenance. Please choose another room.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Row 6: Select Date, Start Time, End Time */}
@@ -1216,7 +1317,7 @@ export default function NewReservationPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || !guidelinesAccepted || isDateInPast || isTimeInPast}
+                disabled={isSubmitting || !guidelinesAccepted || isDateInPast || isTimeInPast || selectedRoom?.status === "Maintenance"}
                 className={cn(
                   "rounded-xl px-7 h-10 text-xs font-bold shadow-xs gap-1.5 transition-all",
                   guidelinesAccepted && !isDateInPast && !isTimeInPast

@@ -25,6 +25,7 @@ import { useUserRole } from "@/hooks/use-user-role";
 import { useImpersonation } from "@/hooks/use-impersonation";
 import { useMinistries } from "@/hooks/use-ministries";
 import { requestPasswordReset } from "@/actions/auth";
+import { recordAuthActivity } from "@/actions/db";
 import { LogOut, ChevronDown, QrCode, KeyRound, User, Loader2 } from "lucide-react";
 
 export function UserNav() {
@@ -43,6 +44,19 @@ export function UserNav() {
       if (impersonatedWorkerId) {
         stopImpersonation();
         return;
+      }
+      if (typeof window !== "undefined" && user?.id) {
+        sessionStorage.removeItem(`cog_session_login_${user.id}`);
+      }
+      try {
+        await recordAuthActivity("User Logout", {
+          userId: workerProfile?.id || user?.id || null,
+          email: user?.email || workerProfile?.email || null,
+          name: displayName,
+          details: "User signed out manually",
+        });
+      } catch (logErr) {
+        console.warn('Failed to record logout activity:', logErr);
       }
       await supabase.auth.signOut();
     } catch (error: any) {

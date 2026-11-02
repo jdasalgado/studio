@@ -22,7 +22,6 @@ import {
   ArrowLeftRight,
   Layers,
   History,
-  Filter,
 } from 'lucide-react';
 import {
   Card,

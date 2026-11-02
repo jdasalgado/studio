@@ -49,6 +49,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getVenueElements, createVenueElement, updateVenueElement, deleteVenueElement, getMinistries } from "@/actions/db";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/use-user-role";
+import { useAuditLog } from "@/hooks/use-audit-log";
 import { DeleteConfirmationDialog } from "@/components/common/delete-confirmation-dialog";
 
 const CategoryIcon = ({ category }: { category: string }) => {
@@ -173,6 +174,7 @@ const ElementForm = ({
 export default function VenueElementsManagementPage() {
     const { canManageFacilities, isLoading: isRoleLoading, myMinistryIds, isSuperAdmin } = useUserRole();
     const { toast } = useToast();
+    const { logAction } = useAuditLog();
     const queryClient = useQueryClient();
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -198,8 +200,16 @@ export default function VenueElementsManagementPage() {
                 return createVenueElement(data);
             }
         },
-        onSuccess: (_, data) => {
+        onSuccess: async (_, data) => {
             queryClient.invalidateQueries({ queryKey: ["venue-elements"] });
+            const action = data.id ? 'Updated Venue Element' : 'Created Venue Element';
+            await logAction(
+                action,
+                'Facilities',
+                `${action} "${data.name}" (Category: ${data.category})`,
+                data.id || undefined,
+                data.name
+            );
             toast({ title: data.id ? 'Element Updated' : 'Element Added' });
             setIsSheetOpen(false);
         },
@@ -210,8 +220,17 @@ export default function VenueElementsManagementPage() {
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteVenueElement(id),
-        onSuccess: () => {
+        onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: ["venue-elements"] });
+            if (elementToDelete) {
+                await logAction(
+                    'Deleted Venue Element',
+                    'Facilities',
+                    `Deleted venue element "${elementToDelete.name}"`,
+                    elementToDelete.id,
+                    elementToDelete.name
+                );
+            }
             toast({ title: 'Element Deleted' });
         },
         onError: () => {
@@ -223,8 +242,8 @@ export default function VenueElementsManagementPage() {
 
     const filteredElements = React.useMemo(() => {
         if (!elements) return [];
-        if (isSuperAdmin) return elements;
-        return elements.filter((e: any) => myMinistryIds.includes(e.providerMinistryId));
+        const base = isSuperAdmin ? elements : elements.filter((e: any) => myMinistryIds.includes(e.providerMinistryId));
+        return [...base].reverse();
     }, [elements, isSuperAdmin, myMinistryIds]);
 
     const availableMinistries = React.useMemo(() => {

@@ -302,10 +302,11 @@ export default function AllReservationsPage() {
 
         return matchesSearch && matchesStatus && matchesRoom && matchesDate;
       })
-      .sort(
-        (a: any, b: any) =>
-          toJsDate(b.start).getTime() - toJsDate(a.start).getTime()
-      );
+      .sort((a: any, b: any) => {
+        const timeB = b.dateRequested ? new Date(b.dateRequested).getTime() : toJsDate(b.start).getTime();
+        const timeA = a.dateRequested ? new Date(a.dateRequested).getTime() : toJsDate(a.start).getTime();
+        return timeB - timeA;
+      });
   }, [
     allBookings,
     searchTerm,

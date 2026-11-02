@@ -3,7 +3,7 @@
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '@studio/database/prisma';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 import { NotificationService } from '@/services/notification-service';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { EmailService } from '@/services/email-service';
@@ -508,8 +508,8 @@ export async function getPaginatedWorkers(
         }
     }
 
-    const sortField = filters.sortField || 'workerId';
-    const sortDir = filters.sortDir || 'asc';
+    const sortField = filters.sortField || 'createdAt';
+    const sortDir = filters.sortDir || 'desc';
     const offset = (page - 1) * limit;
 
     // Build ORDER BY — workerId sorts numerically via CAST to avoid "10 < 2" string ordering
@@ -1432,8 +1432,8 @@ export async function updateWorkerProfileSettings(workerId: string, data: {
     const updatePayload: any = {
         remarks: updatedRemarks,
     };
-    if (data.firstName?.trim()) updatePayload.firstName = data.firstName.trim();
-    if (data.lastName?.trim()) updatePayload.lastName = data.lastName.trim();
+    if (data.firstName?.trim()) updatePayload.firstName = data.firstName.trim().slice(0, 10);
+    if (data.lastName?.trim()) updatePayload.lastName = data.lastName.trim().slice(0, 10);
     if (isEmailChanging) updatePayload.email = newEmail;
 
     const updatedWorker = await prisma.worker.update({
@@ -1820,8 +1820,7 @@ export async function getMinistries(actorId?: string | any): Promise<any[]> {
             department: true,
         },
         orderBy: [
-            { department: { weight: 'asc' } },
-            { weight: 'asc' },
+            { weight: 'desc' },
             { name: 'asc' },
         ],
     });
@@ -1834,9 +1833,11 @@ export async function getMinistries(actorId?: string | any): Promise<any[]> {
 export async function createMinistry(data: any) {
     const departmentCode = normalizeDepartmentCode(data.departmentCode || data.department);
     const { department, departmentCode: _departmentCode, ...rest } = data;
+    const weight = data.weight ?? Math.floor(Date.now() / 1000);
     const ministry = await prisma.ministry.create({
         data: {
             ...rest,
+            weight,
             department: {
                 connect: { code: departmentCode },
             },
@@ -1997,9 +1998,10 @@ export async function getBookings(filters: {
             },
         },
         ...(filters.take ? { take: filters.take } : {}),
-        orderBy: {
-            start: 'asc',
-        },
+        orderBy: [
+            { dateRequested: 'desc' },
+            { start: 'desc' },
+        ],
     });
 }
 
@@ -2043,6 +2045,14 @@ export async function createBooking(data: any) {
     const { workerProfileId, roomId, ...rest } = data;
     if (!workerProfileId) throw new Error('workerProfileId is required to create a booking');
     if (!roomId) throw new Error('roomId is required to create a booking');
+
+    const targetRoom = await prisma.room.findUnique({
+        where: { id: roomId },
+        select: { id: true, name: true, status: true },
+    });
+    if (targetRoom && targetRoom.status === 'Maintenance') {
+        throw new Error(`Room "${targetRoom.name}" is currently under maintenance and cannot be reserved.`);
+    }
 
     const access = await getActorMinistryAccess(workerProfileId);
     if (!access.isSuperAdmin && access.allowedMinistryIds !== null) {
@@ -2098,6 +2108,19 @@ export async function submitRoomReservation(data: {
     const { roomId, start, end } = bookingData;
 
     try {
+        if (roomId) {
+            const targetRoom = await prisma.room.findUnique({
+                where: { id: roomId },
+                select: { id: true, name: true, status: true },
+            });
+            if (targetRoom && targetRoom.status === 'Maintenance') {
+                return {
+                    success: false,
+                    error: `Room "${targetRoom.name}" is currently under maintenance and cannot be reserved.`,
+                };
+            }
+        }
+
         // 1. Fast database-indexed conflict check
         if (start && end && roomId) {
             const conflicting = await prisma.booking.findFirst({
@@ -2823,7 +2846,7 @@ export async function getRooms() {
             },
         },
         orderBy: {
-            weight: 'asc',
+            weight: 'desc',
         },
     });
     setCached(cacheKey, rooms, 60_000);
@@ -2831,26 +2854,37 @@ export async function getRooms() {
 }
 
 export async function createRoom(data: any) {
-    const room = await prisma.room.create({ data });
+    await invalidateServerCache('rooms');
+    const weight = data.weight ?? Math.floor(Date.now() / 1000);
+    const room = await prisma.room.create({
+        data: {
+            ...data,
+            weight,
+        },
+    });
     revalidatePath('/settings/rooms');
     return room;
 }
 
 export async function updateRoom(id: string, data: any) {
+    await invalidateServerCache('rooms');
+    const { id: _ignored, area, bookings, venueBookings, assistanceConfigurations, ...cleanData } = data;
     const room = await prisma.room.update({
         where: { id },
-        data,
+        data: cleanData,
     });
     revalidatePath('/settings/rooms');
     return room;
 }
 
 export async function deleteRoom(id: string) {
+    await invalidateServerCache('rooms');
     await prisma.room.delete({ where: { id } });
     revalidatePath('/settings/rooms');
 }
 
 export async function createRooms(data: any[]) {
+    await invalidateServerCache('rooms');
     await prisma.room.createMany({ data });
     revalidatePath('/settings/rooms');
 }
@@ -3665,11 +3699,147 @@ export async function createTransactionLog(data: any) {
     });
 }
 
-export async function getTransactionLogs() {
-    return await prisma.transactionLog.findMany({
-        orderBy: { timestamp: 'desc' },
-        take: 200,
+export async function recordAuthActivity(
+    action: "User Login" | "User Logout",
+    actor?: {
+        userId?: string | null;
+        email?: string | null;
+        name?: string | null;
+        details?: string | null;
+    }
+) {
+    noStore();
+    try {
+        const cleanEmail = actor?.email?.trim().toLowerCase();
+        let matchedWorker = null;
+
+        if (cleanEmail) {
+            matchedWorker = await prisma.worker.findFirst({
+                where: { email: { equals: cleanEmail, mode: "insensitive" } },
+                select: { id: true, firstName: true, lastName: true, email: true },
+            });
+        }
+
+        if (!matchedWorker && actor?.userId) {
+            matchedWorker = await prisma.worker.findUnique({
+                where: { id: actor.userId },
+                select: { id: true, firstName: true, lastName: true, email: true },
+            });
+        }
+
+        const resolvedName = matchedWorker
+            ? `${matchedWorker.firstName} ${matchedWorker.lastName}`.trim()
+            : actor?.name || cleanEmail?.split("@")[0] || "User";
+
+        const resolvedEmail = matchedWorker?.email || cleanEmail || null;
+        const resolvedId = matchedWorker?.id || actor?.userId || null;
+        const details = actor?.details || (action === "User Login" ? "User logged in successfully via Web" : "User signed out");
+
+        return await prisma.transactionLog.create({
+            data: {
+                userId: resolvedId,
+                userEmail: resolvedEmail,
+                userName: resolvedName,
+                action,
+                module: "Auth",
+                details,
+                targetName: resolvedName,
+            },
+        });
+    } catch (err) {
+        console.warn("[recordAuthActivity] Failed to record auth activity:", err);
+        return null;
+    }
+}
+
+export async function getTransactionLogs(limit: number = 1000) {
+    noStore();
+    const [txLogs, invLogs, allWorkers] = await Promise.all([
+        prisma.transactionLog.findMany({
+            orderBy: { timestamp: "desc" },
+            take: limit,
+        }),
+        prisma.inventoryLog.findMany({
+            orderBy: { timestamp: "desc" },
+            take: limit,
+            include: {
+                item: { select: { id: true, name: true, inventoryCode: true, unit: true } },
+                worker: { select: { id: true, firstName: true, lastName: true, email: true } },
+            },
+        }),
+        prisma.worker.findMany({
+            select: { id: true, firstName: true, lastName: true, email: true },
+        }),
+    ]);
+
+    const workerEmailMap = new Map<string, string>();
+    const workerIdMap = new Map<string, string>();
+    allWorkers.forEach((w) => {
+        const fullName = `${w.firstName} ${w.lastName}`.trim();
+        if (w.email) workerEmailMap.set(w.email.toLowerCase(), fullName);
+        if (w.id) workerIdMap.set(w.id, fullName);
     });
+
+    const mappedInvLogs = invLogs.map((inv) => {
+        const workerName = inv.worker
+            ? `${inv.worker.firstName} ${inv.worker.lastName}`.trim()
+            : "User";
+        const workerEmail = inv.worker?.email || null;
+        const workerId = inv.worker?.id || null;
+        const itemName = inv.item?.name || "Stock Item";
+        const itemCode = inv.item?.inventoryCode ? ` (${inv.item.inventoryCode})` : "";
+        const unit = inv.item?.unit || "pcs";
+
+        let action = inv.type || "Stock Monitoring";
+        if (action === "Stock In") action = "Stock In (+)";
+        else if (action === "Stock Out") action = "Stock Out (-)";
+        else if (action === "Adjustment") action = "Stock Adjustment";
+
+        return {
+            id: `inv-${inv.id}`,
+            timestamp: inv.timestamp,
+            userId: workerId,
+            userName: workerName,
+            userEmail: workerEmail,
+            action: action,
+            module: "Stock Monitoring",
+            details: `${action} applied to "${itemName}"${itemCode}. Quantity: ${inv.quantity} ${unit}. New Balance: ${inv.balance} ${unit}. Notes: ${inv.notes || "None"}`,
+            targetId: inv.itemId,
+            targetName: itemName,
+        };
+    });
+
+    // Exclude any redundant Stock Monitoring logs from txLogs so they never duplicate with mappedInvLogs
+    // And resolve real worker name for any log with email/id
+    const deduplicatedTxLogs = txLogs
+        .filter((tx) => {
+            const mod = (tx.module || "").toLowerCase();
+            const act = (tx.action || "").toLowerCase();
+            if (mod === "stock monitoring" && act.includes("stock")) {
+                return false;
+            }
+            return true;
+        })
+        .map((tx) => {
+            const emailKey = (tx.userEmail || "").toLowerCase();
+            const idKey = tx.userId || "";
+            const matchedName = workerEmailMap.get(emailKey) || workerIdMap.get(idKey);
+            if (matchedName) {
+                return {
+                    ...tx,
+                    userName: matchedName,
+                };
+            }
+            return tx;
+        });
+
+    const combined = [...deduplicatedTxLogs, ...mappedInvLogs].sort((a, b) => {
+        const tA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const tB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return tB - tA;
+    });
+
+    return combined.slice(0, limit);
 }
 
 export async function getWorkerLogs(workerId: string) {
@@ -3681,7 +3851,7 @@ export async function getWorkerLogs(workerId: string) {
             ]
         },
         orderBy: {
-            timestamp: 'desc',
+            timestamp: "desc",
         },
         take: 50,
     });

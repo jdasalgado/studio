@@ -109,7 +109,10 @@ export function useRooms() {
     return {
         rooms: (roomsQuery.data?.map(r => ({
             ...r,
-            weight: r.weight ?? undefined
+            weight: r.weight ?? undefined,
+            status: (r as any).status ?? 'Active',
+            numChairs: (r as any).numChairs ?? null,
+            numTables: (r as any).numTables ?? null,
         })) as Room[]) || [],
         areas: (areasQuery.data?.map(a => ({
             ...a,

@@ -774,15 +774,8 @@ function AdminDashboard() {
               )}
             </div>
 
-            <div className="pt-3 mt-2 border-t border-slate-200 dark:border-border/80 flex items-center justify-between">
-              <Link
-                href="/reports"
-                className="text-xs font-bold text-primary hover:underline flex items-center gap-1 group"
-              >
-                <span>View all activity audit logs</span>
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-              </Link>
-              {lowStockItems.length > 0 && (
+            {lowStockItems.length > 0 && (
+              <div className="pt-3 mt-2 border-t border-slate-200 dark:border-border/80 flex items-center justify-end">
                 <Link
                   href="/inventory?tab=items&status=Low Stock"
                   className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
@@ -790,8 +783,8 @@ function AdminDashboard() {
                   <AlertTriangle className="h-3 w-3" />
                   <span>Restock ({lowStockItems.length})</span>
                 </Link>
-              )}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -22,7 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { updateBooking } from "@/actions/db";
 import { useToast } from "@/hooks/use-toast";
 import { toJsDate } from "@/lib/utils";
-import { isValidEmail } from "@/lib/validation";
+import { isValidEmail, isValidName, cleanName, MAX_LENGTHS } from "@/lib/validation";
 import type { Booking, Ministry, Worker } from "@studio/types";
 import { LoaderCircle } from "lucide-react";
 
@@ -85,11 +85,38 @@ export function EditReservationDialog({
       return;
     }
 
-    if (email.trim() && !isValidEmail(email.trim())) {
+    if (requesterName.trim().length > MAX_LENGTHS.NAME) {
+      toast({
+        variant: "destructive",
+        title: "Name Too Long",
+        description: `Requester name must not exceed ${MAX_LENGTHS.NAME} characters.`,
+      });
+      return;
+    }
+
+    if (!isValidName(requesterName.trim(), 2, MAX_LENGTHS.NAME)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Requester Name",
+        description: `Please enter a valid name (letters only, up to ${MAX_LENGTHS.NAME} characters).`,
+      });
+      return;
+    }
+
+    if (purpose.trim().length > MAX_LENGTHS.PURPOSE) {
+      toast({
+        variant: "destructive",
+        title: "Purpose Too Long",
+        description: `Purpose must not exceed ${MAX_LENGTHS.PURPOSE} characters.`,
+      });
+      return;
+    }
+
+    if (email.trim() && !isValidEmail(email.trim(), MAX_LENGTHS.EMAIL)) {
       toast({
         variant: "destructive",
         title: "Invalid Email Address",
-        description: "Please enter a valid email format.",
+        description: `Please enter a valid email format (up to ${MAX_LENGTHS.EMAIL} characters).`,
       });
       return;
     }
@@ -187,8 +214,9 @@ export function EditReservationDialog({
                   Requester Name
                 </label>
                 <Input
+                  maxLength={MAX_LENGTHS.NAME}
                   value={requesterName}
-                  onChange={(e) => setRequesterName(e.target.value)}
+                  onChange={(e) => setRequesterName(cleanName(e.target.value, MAX_LENGTHS.NAME))}
                   placeholder="Requester Name"
                   className="bg-background dark:bg-muted/30 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 border border-slate-200/90 dark:border-border rounded-xl h-10 text-xs font-normal shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                 />

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@studio/database';
 import { useAuthStore } from '@studio/store';
 import { isNativeMobileApp } from '@/lib/native-app';
+import { recordAuthActivity } from '@/actions/db';
 
 // 10 minutes of inactivity in milliseconds
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -56,6 +57,19 @@ export function WebIdleTimeout() {
 
       try {
         localStorage.removeItem(STORAGE_KEY);
+        if (typeof window !== 'undefined' && user?.id) {
+          sessionStorage.removeItem(`cog_session_login_${user.id}`);
+        }
+        try {
+          await recordAuthActivity("User Logout", {
+            userId: user?.id || null,
+            email: user?.email || null,
+            name: user?.displayName || user?.email || 'User',
+            details: "User automatically signed out due to 10 minutes of inactivity",
+          });
+        } catch (logErr) {
+          console.warn('Failed to record idle timeout logout:', logErr);
+        }
         await supabase.auth.signOut();
         useAuthStore.getState()._setAuthState(null, false, null);
       } catch (err) {

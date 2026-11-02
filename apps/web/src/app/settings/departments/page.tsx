@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@stud
 import { Building2, UserCog, LoaderCircle, Users, Utensils, ArrowRight, ArrowLeft, X } from "lucide-react";
 import type { Department, Worker } from "@studio/types";
 import { useUserRole } from "@/hooks/use-user-role";
+import { useAuditLog } from "@/hooks/use-audit-log";
 import { useToast } from "@/hooks/use-toast";
 import { useWorkers } from "@/hooks/use-workers";
 import { useDepartments } from "@/hooks/use-departments";
@@ -96,6 +97,7 @@ function ManageDepartmentDialog({ departmentName, departmentData, workers, onSav
             <Label className="text-xs font-bold text-foreground">Description</Label>
             <Textarea
               value={description}
+              maxLength={500}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the department's purpose..."
               className="rounded-xl border-slate-200/90 dark:border-border text-xs min-h-[90px] focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar bg-background resize-none transition-all"
@@ -136,7 +138,7 @@ function ManageDepartmentDialog({ departmentName, departmentData, workers, onSav
                     return;
                   }
                   const parsed = parseInt(raw, 10);
-                  setWeekdayAlloc(isNaN(parsed) ? 0 : parsed);
+                  setWeekdayAlloc(isNaN(parsed) ? 0 : Math.min(10000, Math.max(0, parsed)));
                 }}
                 className="h-11 rounded-xl border-slate-200/90 dark:border-border text-base font-bold text-foreground bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
               />
@@ -157,7 +159,7 @@ function ManageDepartmentDialog({ departmentName, departmentData, workers, onSav
                     return;
                   }
                   const parsed = parseInt(raw, 10);
-                  setSundayAlloc(isNaN(parsed) ? 0 : parsed);
+                  setSundayAlloc(isNaN(parsed) ? 0 : Math.min(10000, Math.max(0, parsed)));
                 }}
                 className="h-11 rounded-xl border-slate-200/90 dark:border-border text-base font-bold text-foreground bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
               />
@@ -273,6 +275,7 @@ const DEPT_COLORS: Record<string, { stripe: string; iconBadge: string; progress:
 export default function DepartmentManagementPage() {
   const { canManageMinistries, isLoading: isRoleLoading } = useUserRole();
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deptToManage, setDeptToManage] = useState<Department | null>(null);
@@ -309,7 +312,16 @@ export default function DepartmentManagementPage() {
 
   const handleSave = async (id: string, headId: string | null, desc: string, weekday: number, sunday: number) => {
     try {
+      const assignedHead = workers?.find(w => w.id === headId);
+      const headName = assignedHead ? `${assignedHead.firstName} ${assignedHead.lastName}`.trim() : "None";
       await upsertDepartment({ id, data: { headId, description: desc, mealStubWeekdayAllocation: weekday, mealStubSundayAllocation: sunday } });
+      await logAction(
+        "Updated Department",
+        "Departments",
+        `Updated ${id} department (Head: ${headName}, Weekday: ${weekday}, Sunday: ${sunday})`,
+        id,
+        id
+      );
       toast({ title: "Department Updated", description: `${id} department updated successfully.` });
       setSheetOpen(false);
     } catch {

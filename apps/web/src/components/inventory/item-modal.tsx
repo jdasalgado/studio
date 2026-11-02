@@ -42,6 +42,8 @@ import {
   Camera,
 } from 'lucide-react';
 import { useInventory, type InventoryItem } from '@/hooks/use-inventory';
+import { useUserRole } from '@/hooks/use-user-role';
+import { useAuthStore } from '@studio/store';
 import { cn } from '@/lib/utils';
 
 interface ItemModalProps {
@@ -53,6 +55,8 @@ interface ItemModalProps {
 
 export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
   const { categories, locations, fetchCategories, fetchLocations, createItem, updateItem } = useInventory();
+  const { workerProfile } = useUserRole();
+  const { user } = useAuthStore();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -204,19 +208,57 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      setError('Item name is required');
+      setError('Item Name is required. Please provide a name for this item.');
+      return;
+    }
+    if (formData.name.trim().length > 50) {
+      setError('Item Name is too long (maximum 50 characters).');
       return;
     }
     if (!formData.categoryId) {
-      setError('Please select a category');
+      setError('Category is required. Please select a category from the dropdown.');
       return;
     }
-    if (formData.stock !== undefined && formData.stock < 0) {
-      setError('Current stock cannot be negative');
+    const stockVal = Number(formData.stock);
+    if (isNaN(stockVal) || stockVal < 0) {
+      setError('Current Stock cannot be negative. Please enter a valid number.');
       return;
     }
-    if (formData.minStock !== undefined && formData.minStock < 0) {
-      setError('Minimum stock alert threshold cannot be negative');
+    if (stockVal > 999999) {
+      setError('Current Stock exceeds the maximum limit (up to 999,999 units only).');
+      return;
+    }
+    const minStockVal = Number(formData.minStock);
+    if (isNaN(minStockVal) || minStockVal < 0) {
+      setError('Minimum Stock Alert cannot be negative.');
+      return;
+    }
+    if (minStockVal > 999999) {
+      setError('Minimum Stock Alert exceeds the maximum limit (up to 999,999 units only).');
+      return;
+    }
+    if (formData.unit && formData.unit.length > 20) {
+      setError('Unit name must not exceed 20 characters (e.g. pcs, box, set).');
+      return;
+    }
+    if (formData.location && formData.location.length > 100) {
+      setError('Location Area / Room must not exceed 100 characters.');
+      return;
+    }
+    if (formData.assignedTo && formData.assignedTo.length > 50) {
+      setError('Assigned Custodian must not exceed 50 characters.');
+      return;
+    }
+    if (formData.aisle && formData.aisle.length > 20) {
+      setError('Aisle code must not exceed 20 characters.');
+      return;
+    }
+    if (formData.shelf && formData.shelf.length > 20) {
+      setError('Shelf code must not exceed 20 characters.');
+      return;
+    }
+    if (formData.bin && formData.bin.length > 20) {
+      setError('Bin code must not exceed 20 characters.');
       return;
     }
 
@@ -224,10 +266,17 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
     setError('');
 
     try {
+      const actorData = {
+        ...formData,
+        actorId: workerProfile?.id || user?.id || null,
+        actorName: workerProfile ? `${workerProfile.firstName} ${workerProfile.lastName}`.trim() : (user?.displayName || user?.email || 'Admin'),
+        actorEmail: user?.email || workerProfile?.email || null,
+      };
+
       if (item?.id) {
-        await updateItem(item.id, formData);
+        await updateItem(item.id, actorData);
       } else {
-        await createItem(formData);
+        await createItem(actorData);
       }
       if (onSaved) onSaved();
       onClose();
@@ -338,9 +387,10 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                   <Input
                     id="item-name"
                     required
+                    maxLength={50}
                     placeholder="e.g. Chauvet DJ SlimPAR Pro LED"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value.slice(0, 50) })}
                     className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 text-foreground font-medium placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                   />
                 </div>
@@ -443,12 +493,13 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                     id="current-stock"
                     type="number"
                     min="0"
+                    max="999999"
                     value={formData.stock}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
-                      const raw = e.target.value;
-                      const cleaned = raw.length > 1 && raw.startsWith("0") ? raw.replace(/^0+/, "") : raw;
-                      setFormData({ ...formData, stock: cleaned === "" ? 0 : parseInt(cleaned, 10) || 0 });
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      const num = raw === "" ? 0 : Math.min(parseInt(raw, 10) || 0, 999999);
+                      setFormData({ ...formData, stock: num });
                     }}
                     className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 font-medium text-foreground focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                   />
@@ -462,12 +513,13 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                     id="min-stock"
                     type="number"
                     min="0"
+                    max="999999"
                     value={formData.minStock}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
-                      const raw = e.target.value;
-                      const cleaned = raw.length > 1 && raw.startsWith("0") ? raw.replace(/^0+/, "") : raw;
-                      setFormData({ ...formData, minStock: cleaned === "" ? 0 : parseInt(cleaned, 10) || 0 });
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      const num = raw === "" ? 0 : Math.min(parseInt(raw, 10) || 0, 999999);
+                      setFormData({ ...formData, minStock: num });
                     }}
                     className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 font-medium text-foreground focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                   />
@@ -479,9 +531,10 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                   </Label>
                   <Input
                     id="unit"
+                    maxLength={20}
                     placeholder="pcs, box, roll"
                     value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value.slice(0, 20) })}
                     className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 font-medium text-foreground focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                   />
                 </div>
@@ -541,9 +594,10 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                   <Label htmlFor="loc-area" className="text-xs font-semibold text-foreground/85">Location Area / Room</Label>
                   <Input
                     id="loc-area"
+                    maxLength={100}
                     placeholder="e.g. 4th Floor Studio"
                     value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value.slice(0, 100) })}
                     list="locations-list"
                     className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 text-foreground font-medium shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                   />
@@ -560,9 +614,10 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                     <Input
                       id="assigned-custodian"
+                      maxLength={50}
                       placeholder="e.g. Tech Head"
                       value={formData.assignedTo}
-                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value.slice(0, 50) })}
                       className="w-full min-w-0 pl-9 h-9 text-xs rounded-xl bg-background border border-border/70 text-foreground font-medium shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                     />
                   </div>
@@ -574,9 +629,10 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                   <Label htmlFor="loc-aisle" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center block truncate">Aisle</Label>
                   <Input
                     id="loc-aisle"
+                    maxLength={20}
                     placeholder="A-1"
                     value={formData.aisle}
-                    onChange={(e) => setFormData({ ...formData, aisle: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, aisle: e.target.value.slice(0, 20) })}
                     className="w-full min-w-0 h-9 px-1.5 text-xs rounded-xl bg-background border border-border/70 text-center font-medium text-foreground shadow-2xs"
                   />
                 </div>
@@ -585,9 +641,10 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                   <Label htmlFor="loc-shelf" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center block truncate">Shelf</Label>
                   <Input
                     id="loc-shelf"
+                    maxLength={20}
                     placeholder="S-2"
                     value={formData.shelf}
-                    onChange={(e) => setFormData({ ...formData, shelf: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, shelf: e.target.value.slice(0, 20) })}
                     className="w-full min-w-0 h-9 px-1.5 text-xs rounded-xl bg-background border border-border/70 text-center font-medium text-foreground shadow-2xs"
                   />
                 </div>
@@ -596,9 +653,10 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                   <Label htmlFor="loc-bin" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center block truncate">Bin</Label>
                   <Input
                     id="loc-bin"
+                    maxLength={20}
                     placeholder="B-04"
                     value={formData.bin}
-                    onChange={(e) => setFormData({ ...formData, bin: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, bin: e.target.value.slice(0, 20) })}
                     className="w-full min-w-0 h-9 px-1.5 text-xs rounded-xl bg-background border border-border/70 text-center font-medium text-foreground shadow-2xs"
                   />
                 </div>
@@ -610,7 +668,7 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
               <div className="flex items-center gap-2 pb-1.5 border-b border-border/50">
                 <Camera className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-xs font-bold text-foreground uppercase tracking-wider font-headline">
-                  Item Photo &amp; Proof (Optional)
+                  Item Photo
                 </span>
               </div>
 

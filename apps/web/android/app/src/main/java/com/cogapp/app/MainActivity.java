@@ -25,16 +25,20 @@ public class MainActivity extends BridgeActivity {
                 Uri uri = Uri.fromParts("package", getPackageName(), null);
                 intent.setData(uri);
                 startActivity(intent);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
         @JavascriptInterface
         public void requestCameraPermission() {
             try {
-                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
+                if (ContextCompat.checkSelfPermission(MainActivity.this,
+                        Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[] { Manifest.permission.CAMERA },
+                            CAMERA_PERMISSION_REQUEST_CODE);
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -44,7 +48,8 @@ public class MainActivity extends BridgeActivity {
 
         // Proactively request camera permission on app launch if not yet granted
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
+            ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.CAMERA },
+                    CAMERA_PERMISSION_REQUEST_CODE);
         }
 
         try {
@@ -65,7 +70,8 @@ public class MainActivity extends BridgeActivity {
                 settings.setAllowFileAccess(true);
                 settings.setMediaPlaybackRequiresUserGesture(false);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -73,7 +79,8 @@ public class MainActivity extends BridgeActivity {
         super.onPause();
         try {
             CookieManager.getInstance().flush();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -81,7 +88,8 @@ public class MainActivity extends BridgeActivity {
         super.onStop();
         try {
             CookieManager.getInstance().flush();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -89,6 +97,7 @@ public class MainActivity extends BridgeActivity {
         super.onDestroy();
         try {
             CookieManager.getInstance().flush();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 }

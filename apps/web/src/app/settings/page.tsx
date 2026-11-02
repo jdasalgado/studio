@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AppLayout } from "@/components/layout/app-layout";
 import {
   LoaderCircle, AlertTriangle, Settings, Shield, Building2,
-  Building, Utensils, MapPin, Clock, ArrowRight,
+  Building, Utensils, MapPin, Clock, ArrowRight, History,
   Users, UtensilsCrossed, ScanLine,
 } from "lucide-react";
 import { useAuthStore } from "@studio/store";
@@ -280,11 +280,11 @@ export default function SettingsPage() {
             )}
             {canManageRoles && (
               <ModuleCard
-                href="/settings/transaction-logs"
-                icon={Clock}
+                href="/activity-logs"
+                icon={History}
                 iconBg="bg-sidebar/10 text-sidebar"
-                title="Transaction Logs"
-                description="Full audit trail of activity across every module."
+                title="Activity Logs"
+                description="Live audit trail of user logins, logouts, and stock monitoring movements."
                 badge="Live"
               />
             )}

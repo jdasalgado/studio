@@ -1,77 +1,58 @@
-# 🌿 Branching Strategy: GitHub Flow
+# System Requirements and Implementation Specifications
 
-This repository follows the **GitHub Flow** branching strategy. This lightweight workflow ensures our `main` branch is always stable and ready for deployment, while allowing for rapid, continuous development of features and bug fixes.
-
-## 🌳 Branch Architecture
-
-### `main`
-* **Purpose:** The production-ready state of the application. 
-* **Rules:**
-  * **NEVER** commit directly to `main`.
-  * All code in `main` must be tested, reviewed, and deployable.
-  * Changes are only integrated into `main` via approved Pull Requests (PRs).
-
-### Feature & Fix Branches
-* **Purpose:** All active development happens here. 
-* **Rules:**
-  * Created by branching off `main`.
-  * Keep branches short-lived and focused on a single task or issue.
-  * Delete the branch locally and remotely once merged.
+## 1. Resources
+* **Development Hardware:** Laptop / Desktop PC for coding, running local development servers, and compiling Android builds.
+* **Mobile Test Device:** Android smartphone (running Android 10 or higher) used for testing camera QR code scanning and mobile UI.
+* **Internet Connection:** Stable broadband or Wi-Fi connection for syncing with the cloud database and fetching dependencies.
+* **Database Hosting:** Supabase (PostgreSQL cloud database).
 
 ---
 
-## 🔄 The Workflow
+## 2. Software Requirements
 
-1. **Update your local `main`:**
-   Always start from the latest production code to prevent merge conflicts.
-   `git checkout main`
-   `git pull origin main`
-
-2. **Create a new branch:**
-   Name it according to our conventions (see below).
-   `git checkout -b feature/user-authentication`
-
-3. **Make changes and commit:**
-   Write clear, semantic commit messages. Commit often to save your progress.
-   `git add .`
-   `git commit -m "feat: add JWT authentication to LoginController.cs"`
-
-4. **Push your branch to the remote repository:**
-   `git push -u origin feature/user-authentication`
-
-5. **Open a Pull Request (PR):**
-   * Go to the repository on GitHub and open a PR against the `main` branch.
-   * Fill out the PR template, linking any relevant tracking tickets or issues.
-   * Request a code review from at least one other team member.
-
-6. **Review, Approve, and Merge:**
-   * Address any feedback from the code review. 
-   * Once approved, merge the PR into `main`.
-   * **Clean up:** Delete your feature branch after merging to keep the repository tidy.
+* **Operating System:** Windows 10 / Windows 11 (64-bit)
+* **Code Editor / IDE:** Visual Studio Code, Android Studio (for Android build and emulation)
+* **Runtime Environment:** Node.js (v20 or higher)
+* **Package Manager:** npm (v10 or higher)
+* **Programming Languages:** TypeScript, JavaScript, SQL
+* **Frontend Framework:** Next.js 16 (React 18 / 19)
+* **Mobile Framework:** Capacitor 8 (Android platform)
+* **Database:** PostgreSQL (hosted on Supabase)
+* **Database ORM:** Prisma ORM (v5.22)
+* **UI & Styling:** Tailwind CSS, Radix UI components, Lucide React icons
+* **State Management & Data Fetching:** TanStack React Query (v5), Zustand
+* **Web Browser:** Google Chrome / Microsoft Edge (for web testing and DevTools debugging)
 
 ---
 
-## 🏷️ Naming Conventions
+## 3. Hardware Requirements
 
-To keep our repository organized, please use the following prefixes for your branch names:
+### Development Machine (PC / Laptop)
 
-| Prefix | Use Case | Example |
-| :--- | :--- | :--- |
-| `feature/` or `feat/` | Developing a new feature | `feature/commission-calculator` |
-| `fix/` or `bugfix/` | Fixing an issue or bug | `fix/sql-timeout-error` |
-| `docs/` | Updating documentation | `docs/api-endpoints` |
-| `refactor/` | Restructuring existing code without changing behavior | `refactor/database-context` |
+**Minimum:**
+* **Processor:** Intel Core i5 (8th Gen) or AMD Ryzen 5
+* **Memory:** 8 GB RAM
+* **Storage:** 256 GB SSD (with at least 15 GB free disk space)
+* **Display:** 1366 x 768 resolution
+
+**Recommended:**
+* **Processor:** Intel Core i5 / i7 (10th Gen or higher) or AMD Ryzen 5 / 7
+* **Memory:** 16 GB RAM (handles simultaneous Next.js dev server, VS Code, and Android Studio builds)
+* **Storage:** 512 GB SSD
+* **Display:** 1920 x 1080 (Full HD)
 
 ---
 
-## 💬 Commit Message Guidelines
+### End-User / Mobile Devices
 
-We use **Semantic Commit Messages** to make our repository history easy to read and understand at a glance. 
+**Minimum:**
+* **Device:** Android Smartphone
+* **Operating System:** Android 10.0
+* **RAM:** 2 GB RAM
+* **Camera:** 5 MP rear camera with auto-focus (for QR scanning)
 
-**Format:** `<type>: <description>`
-
-**Examples:**
-* `feat: create stored procedure for monthly sales totals`
-* `fix: resolve null reference exception in DataGrid binding`
-* `docs: update setup instructions in README`
-* `style: format C# files to standard spacing`
+**Recommended:**
+* **Device:** Android Smartphone
+* **Operating System:** Android 11.0 or higher
+* **RAM:** 4 GB RAM or higher
+* **Camera:** 8 MP or higher with auto-focus

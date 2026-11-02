@@ -799,14 +799,21 @@ export default function ScheduleCalendarPage() {
                       .sort((a, b) => toJsDate(a.start).getTime() - toJsDate(b.start).getTime());
 
                     if (roomBookings.length === 0) {
+                      const isMaintenance = room.status === 'Maintenance';
                       return (
                         <div key={room.id} className="rounded-xl border border-gray-200 dark:border-border overflow-hidden bg-card shadow-2xs">
                           <div className="bg-gray-50/80 dark:bg-muted/40 px-4 py-2.5 border-b border-gray-100 dark:border-border/50 flex items-center justify-between">
                             <p className="text-xs font-bold text-gray-700 dark:text-gray-200">{room.name}</p>
-                            <span className="text-[10px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">Available</span>
+                            {isMaintenance ? (
+                              <span className="text-[10px] font-bold text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded-full">
+                                Maintenance
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">Available</span>
+                            )}
                           </div>
                           <div className="px-4 py-3 text-xs text-muted-foreground italic flex items-center gap-2">
-                            <span>No reservations today</span>
+                            <span>{isMaintenance ? "Room is currently under maintenance" : "No reservations today"}</span>
                           </div>
                         </div>
                       );
@@ -989,7 +996,8 @@ export default function ScheduleCalendarPage() {
                           b.roomId === room.id &&
                           isSameDay(toJsDate(b.start), currentDate)
                       );
-                      const isAvailable = roomDayBookings.length === 0;
+                      const isMaintenance = room.status === 'Maintenance';
+                      const isAvailable = !isMaintenance && roomDayBookings.length === 0;
 
                       return (
                         <div
@@ -1000,19 +1008,35 @@ export default function ScheduleCalendarPage() {
                             <span
                               className={cn(
                                 "w-2 h-2 rounded-full shrink-0",
-                                isAvailable ? "bg-emerald-400" : "bg-sky-300 ring-1 ring-white/30"
+                                isMaintenance
+                                  ? "bg-amber-400 ring-1 ring-amber-300"
+                                  : isAvailable
+                                  ? "bg-emerald-400"
+                                  : "bg-sky-300 ring-1 ring-white/30"
                               )}
-                              title={isAvailable ? "Available today" : `${roomDayBookings.length} reservation(s) today`}
+                              title={
+                                isMaintenance
+                                  ? "Room under maintenance"
+                                  : isAvailable
+                                  ? "Available today"
+                                  : `${roomDayBookings.length} reservation(s) today`
+                              }
                             />
                             <p className="text-xs font-bold text-white truncate">
                               {room.name}
                             </p>
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] text-blue-100/75 truncate font-medium">
-                            {area && <span className="truncate">{area.name}</span>}
-                            {area && room.capacity > 0 && <span>•</span>}
-                            {room.capacity > 0 && <span>{room.capacity} pax</span>}
-                          </div>
+                          {isMaintenance ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-400/25 text-amber-200 border border-amber-400/40 tracking-wider uppercase">
+                              Maintenance
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1 text-[10px] text-blue-100/75 truncate font-medium">
+                              {area && <span className="truncate">{area.name}</span>}
+                              {area && room.capacity > 0 && <span>•</span>}
+                              {room.capacity > 0 && <span>{room.capacity} pax</span>}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

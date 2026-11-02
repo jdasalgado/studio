@@ -49,6 +49,41 @@ export function RealtimeRequestsSync() {
                     queryClient.invalidateQueries({ queryKey: ['approvals'] });
                 }
             )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'TransactionLog' },
+                (payload) => {
+                    console.log('[Realtime] TransactionLog CDC event:', payload.eventType);
+                    queryClient.invalidateQueries({ queryKey: ['transaction-logs'] });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'InventoryLog' },
+                (payload) => {
+                    console.log('[Realtime] InventoryLog CDC event:', payload.eventType);
+                    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+                    queryClient.invalidateQueries({ queryKey: ['transaction-logs'] });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'InventoryItem' },
+                (payload) => {
+                    console.log('[Realtime] InventoryItem CDC event:', payload.eventType);
+                    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+                    queryClient.invalidateQueries({ queryKey: ['transaction-logs'] });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'InventoryBorrowing' },
+                (payload) => {
+                    console.log('[Realtime] InventoryBorrowing CDC event:', payload.eventType);
+                    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+                    queryClient.invalidateQueries({ queryKey: ['transaction-logs'] });
+                }
+            )
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     console.log('[Realtime] Subscribed to real-time requests CDC channel.');

@@ -67,6 +67,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       nextMaintenanceDate,
       parentId,
       inventoryCode,
+      actorId,
+      actorName,
+      actorEmail,
     } = body;
 
     const currentItem = await prisma.inventoryItem.findUnique({ where: { id } });
@@ -75,13 +78,24 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const updateData: any = {};
-    if (name !== undefined) updateData.name = name;
+    if (name !== undefined) {
+      if (!name || !name.trim()) {
+        return NextResponse.json({ error: 'Item Name cannot be empty.' }, { status: 400 });
+      }
+      if (name.trim().length > 50) {
+        return NextResponse.json({ error: 'Item Name must not exceed 50 characters.' }, { status: 400 });
+      }
+      updateData.name = name.trim();
+    }
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (type !== undefined) {
       updateData.type = type.toUpperCase() === 'CONSUMABLE' ? 'CONSUMABLE' : 'EQUIPMENT';
     }
     if (quantity !== undefined || stock !== undefined) {
       const newQty = quantity !== undefined ? Number(quantity) : Number(stock);
+      if (isNaN(newQty) || newQty < 0 || newQty > 999999) {
+        return NextResponse.json({ error: 'Current stock quantity must be between 0 and 999,999.' }, { status: 400 });
+      }
       updateData.quantity = newQty;
       if (status === undefined) {
         if (newQty === 0 && currentItem.status !== 'Borrowed') {
@@ -92,7 +106,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
     if (minQuantity !== undefined || minStock !== undefined) {
-      updateData.minQuantity = minQuantity !== undefined ? Number(minQuantity) : Number(minStock);
+      const newMin = minQuantity !== undefined ? Number(minQuantity) : Number(minStock);
+      if (isNaN(newMin) || newMin < 0 || newMin > 999999) {
+        return NextResponse.json({ error: 'Minimum stock alert must be between 0 and 999,999.' }, { status: 400 });
+      }
+      updateData.minQuantity = newMin;
     }
     if (unit !== undefined) updateData.unit = unit;
     if (status !== undefined) updateData.status = status;
@@ -131,6 +149,37 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       });
     }
 
+    // Record in overall Activity / TransactionLog
+    try {
+      const stockChanged = updateData.quantity !== undefined && updateData.quantity !== currentItem.quantity;
+      const oldStock = currentItem.quantity;
+      const newStock = updateData.quantity ?? oldStock;
+      const diff = newStock - oldStock;
+
+      let actionDesc = 'Update Item';
+      let detailsDesc = `Updated item specifications for "${updated.name}".`;
+
+      if (stockChanged) {
+        actionDesc = diff > 0 ? 'Stock In (+)' : 'Stock Out (-)';
+        detailsDesc = `Stock modified for "${updated.name}" (${updated.inventoryCode || 'No Barcode'}) from ${oldStock} to ${newStock} (${diff > 0 ? '+' : ''}${diff} ${updated.unit || 'pcs'}). Status: ${updated.status}.`;
+      }
+
+      await prisma.transactionLog.create({
+        data: {
+          userId: actorId || null,
+          userName: actorName || 'Inventory Staff',
+          userEmail: actorEmail || null,
+          action: actionDesc,
+          module: 'Inventory',
+          details: detailsDesc,
+          targetId: updated.id,
+          targetName: updated.name,
+        },
+      });
+    } catch (logErr) {
+      console.warn('Failed to record transaction log for item update:', logErr);
+    }
+
     return NextResponse.json({
       ...updated,
       stock: updated.quantity,
@@ -139,13 +188,27 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
   } catch (error: any) {
     console.error('[PUT /api/inventory/items/[id]] error:', error);
-    return NextResponse.json({ error: 'Failed to update item', details: error?.message }, { status: 500 });
+    let userMsg = 'Failed to update item.';
+    if (error?.message?.includes('Int out of range') || error?.code === 'P2020') {
+      userMsg = 'Stock quantity or number value is too large (maximum 999,999 allowed).';
+    } else if (error?.code === 'P2002') {
+      userMsg = 'An item with this barcode/code already exists. Please choose a different code.';
+    } else if (error?.message) {
+      userMsg = error.message;
+    }
+    return NextResponse.json({ error: userMsg, details: error?.message }, { status: 400 });
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const { searchParams } = new URL(req.url);
+    const actorId = searchParams.get('actorId');
+    const actorName = searchParams.get('actorName');
+    const actorEmail = searchParams.get('actorEmail');
+
+    const itemToDelete = await prisma.inventoryItem.findUnique({ where: { id } });
 
     // Delete related logs and borrowings first if needed
     await prisma.$transaction([
@@ -153,6 +216,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       prisma.inventoryBorrowing.deleteMany({ where: { itemId: id } }),
       prisma.inventoryItem.delete({ where: { id } }),
     ]);
+
+    if (itemToDelete) {
+      try {
+        await prisma.transactionLog.create({
+          data: {
+            userId: actorId || null,
+            userName: actorName || 'Inventory Staff',
+            userEmail: actorEmail || null,
+            action: 'Delete Item',
+            module: 'Inventory',
+            details: `Permanently deleted item "${itemToDelete.name}" (Code: ${itemToDelete.inventoryCode || 'N/A'}, Remaining Stock: ${itemToDelete.quantity} ${itemToDelete.unit || 'pcs'}).`,
+            targetId: id,
+            targetName: itemToDelete.name,
+          },
+        });
+      } catch (logErr) {
+        console.warn('Failed to record transaction log for item deletion:', logErr);
+      }
+    }
 
     return NextResponse.json({ success: true, message: 'Item deleted successfully' });
   } catch (error: any) {

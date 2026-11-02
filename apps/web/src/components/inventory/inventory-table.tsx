@@ -5,12 +5,9 @@ import {
   Search,
   Plus,
   QrCode,
-  Download,
-  Upload,
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
-  Filter,
   CheckCircle2,
   AlertTriangle,
   Package,
@@ -18,7 +15,6 @@ import {
   Pencil,
   Trash2,
   RefreshCw,
-  Clock,
   MapPin,
   X,
   SlidersHorizontal,
@@ -26,8 +22,6 @@ import {
   ArrowDown,
   Boxes,
   Tag,
-  FileSpreadsheet,
-  Check,
   Activity,
 } from 'lucide-react';
 import {
@@ -66,6 +60,8 @@ import {
 } from '@studio/ui';
 import { cn } from '@/lib/utils';
 import { useInventory, type InventoryItem } from '@/hooks/use-inventory';
+import { useUserRole } from '@/hooks/use-user-role';
+import { useAuthStore } from '@studio/store';
 import { useToast } from '@/hooks/use-toast';
 import { exportToExcel } from '@/lib/export-excel';
 import { ExportConfirmDialog } from '@/components/common/export-confirm-dialog';
@@ -151,6 +147,8 @@ export function InventoryTable({
   } = useInventory();
 
   const { toast } = useToast();
+  const { workerProfile } = useUserRole();
+  const { user } = useAuthStore();
   const router = useRouter();
 
   // Filters & Pagination
@@ -260,10 +258,17 @@ export function InventoryTable({
     setSelectedIds(next);
   };
 
+  // Actor metadata for transaction logs
+  const currentActor = {
+    id: workerProfile?.id || user?.id || null,
+    name: workerProfile ? `${workerProfile.firstName} ${workerProfile.lastName}`.trim() : (user?.displayName || user?.email || 'User'),
+    email: user?.email || workerProfile?.email || null,
+  };
+
   // Quick Single Stock Actions (+1 / -1)
   const handleQuickStock = async (item: InventoryItem, action: 'Stock In' | 'Stock Out') => {
     try {
-      await updateStock(item.id, action, 1);
+      await updateStock(item.id, action, 1, undefined, currentActor);
       const newStock = action === 'Stock In' ? item.stock + 1 : Math.max(0, item.stock - 1);
       const min = item.minStock || 5;
       const isNowLow = newStock <= min;
@@ -302,7 +307,7 @@ export function InventoryTable({
 
     setIsAdjusting(true);
     try {
-      await updateStock(stockAdjustItem.id, adjustAction, adjustQuantity, adjustNote.trim() || undefined);
+      await updateStock(stockAdjustItem.id, adjustAction, adjustQuantity, adjustNote.trim() || undefined, currentActor);
       toast({
         title: 'Stock adjusted successfully',
         description: `${adjustAction} of ${adjustQuantity} ${stockAdjustItem.unit || 'pcs'} applied to ${stockAdjustItem.name}.`,

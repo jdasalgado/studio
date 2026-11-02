@@ -59,6 +59,7 @@ function MinistryForm({ ministry, workers, departments, onSave, onClose }: {
   const sorted = [...workers].sort((a, b) => a.firstName.localeCompare(b.firstName));
   const selectedHead = workers.find(w => w.id === formData.headId);
   const [confirmClearHead, setConfirmClearHead] = useState(false);
+  const [formError, setFormError] = useState('');
 
   return (
     <div className="flex flex-col h-full max-h-[90vh] overflow-hidden">
@@ -94,6 +95,11 @@ function MinistryForm({ ministry, workers, departments, onSave, onClose }: {
 
       {/* ── SCROLLABLE BODY ── */}
       <div className="p-5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
+        {formError && (
+          <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+            {formError}
+          </div>
+        )}
         {/* Card 1: Ministry Information */}
         <div className="rounded-2xl border border-border/70 bg-slate-50/60 dark:bg-muted/20 p-4 sm:p-5 space-y-4 shadow-2xs">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sidebar dark:text-sky-400">
@@ -107,7 +113,8 @@ function MinistryForm({ ministry, workers, departments, onSave, onClose }: {
             </Label>
             <Input
               value={formData.name}
-              onChange={e => set("name", e.target.value)}
+              maxLength={50}
+              onChange={e => { set("name", e.target.value); setFormError(''); }}
               placeholder="e.g. Media & Tech Ministry"
               className="h-10 rounded-xl border-slate-200/90 dark:border-border text-xs bg-background shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar"
             />
@@ -135,7 +142,8 @@ function MinistryForm({ ministry, workers, departments, onSave, onClose }: {
             <Label className="text-xs font-bold text-foreground">Description</Label>
             <Textarea
               value={formData.description}
-              onChange={e => set("description", e.target.value)}
+              maxLength={500}
+              onChange={e => { set("description", e.target.value); setFormError(''); }}
               placeholder="Brief overview of the ministry's role..."
               className="rounded-xl border-slate-200/90 dark:border-border text-xs min-h-[85px] focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar bg-background resize-none transition-all"
             />
@@ -230,8 +238,21 @@ function MinistryForm({ ministry, workers, departments, onSave, onClose }: {
           Cancel
         </Button>
         <Button
-          onClick={() => onSave(formData)}
-          disabled={!formData.name?.trim()}
+          onClick={() => {
+              if (!formData.name?.trim()) {
+                setFormError('Ministry Name is required.');
+                return;
+              }
+              if (formData.name.trim().length > 50) {
+                setFormError('Ministry Name must not exceed 50 characters.');
+                return;
+              }
+              if (formData.description && formData.description.length > 500) {
+                setFormError('Description must not exceed 500 characters.');
+                return;
+              }
+              onSave(formData);
+            }}
           className="bg-sidebar hover:bg-sidebar/90 text-white rounded-xl h-10 px-5 sm:px-6 text-xs font-bold shadow-xs transition-all active:scale-[0.99] cursor-pointer flex-1 sm:flex-initial disabled:opacity-50"
         >
           {ministry?.id ? "Save Changes" : "Create Ministry"}
@@ -432,7 +453,7 @@ export default function MinistryManagementPage() {
     if (q && !m.name.toLowerCase().includes(q)) return false;
     if (deptFilter !== "all" && m.department !== deptFilter) return false;
     return true;
-  }).sort((a, b) => { const wa = a.weight ?? 0, wb = b.weight ?? 0; return wa !== wb ? wa - wb : a.name.localeCompare(b.name); });
+  }).sort((a, b) => { const wa = a.weight ?? 0, wb = b.weight ?? 0; return wa !== wb ? wb - wa : a.name.localeCompare(b.name); });
 
   if (isLoading) return <AppLayout><div className="flex justify-center py-10"><LoaderCircle className="h-8 w-8 animate-spin" /></div></AppLayout>;
   if (!canManageMinistries) return <AppLayout><Card><CardHeader><CardTitle>Access Denied</CardTitle><CardDescription>No permission.</CardDescription></CardHeader></Card></AppLayout>;

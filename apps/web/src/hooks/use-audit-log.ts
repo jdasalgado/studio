@@ -1,11 +1,15 @@
 import { useSupabaseUser } from '@studio/database';
 import { useUserRole } from './use-user-role';
+import { useAuthStore } from '@studio/store';
 import { useCallback } from 'react';
 import { createTransactionLog } from '@/actions/db';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function useAuditLog() {
-    const { user } = useSupabaseUser();
+    const { user: supabaseUser } = useSupabaseUser();
     const { workerProfile } = useUserRole();
+    const { user: authStoreUser } = useAuthStore();
+    const queryClient = useQueryClient();
 
     const logAction = useCallback(async (
         action: string,
@@ -14,23 +18,31 @@ export function useAuditLog() {
         targetId?: string,
         targetName?: string
     ) => {
-        if (!user || !workerProfile) return;
+        const currentUser = supabaseUser || authStoreUser;
+        if (!currentUser && !workerProfile) return;
+
+        const resolvedId = workerProfile?.id || currentUser?.id || null;
+        const resolvedEmail = currentUser?.email || workerProfile?.email || null;
+        const resolvedName = workerProfile?.firstName 
+            ? `${workerProfile.firstName} ${workerProfile.lastName}`.trim()
+            : (currentUser as any)?.displayName || currentUser?.email?.split('@')[0] || 'User';
 
         try {
             await createTransactionLog({
-                userId: workerProfile.id,
-                userEmail: user.email || 'Unknown',
-                userName: `${workerProfile.firstName} ${workerProfile.lastName}`.trim(),
+                userId: resolvedId,
+                userEmail: resolvedEmail,
+                userName: resolvedName,
                 action,
                 module,
                 details: details || '',
                 targetId: targetId || null,
                 targetName: targetName || null,
             });
+            queryClient.invalidateQueries({ queryKey: ['transaction-logs'] });
         } catch (e) {
             console.error('Failed to write audit log', e);
         }
-    }, [user, workerProfile]);
+    }, [supabaseUser, authStoreUser, workerProfile, queryClient]);
 
     return { logAction };
 }

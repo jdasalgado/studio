@@ -26,7 +26,8 @@ import { Calendar } from "@studio/ui";
 import { Switch } from "@studio/ui";
 import { Separator } from "@studio/ui";
 import { format } from "date-fns";
-import { CalendarIcon, RefreshCw, Users, Bell } from "lucide-react";
+import { MAX_LENGTHS } from "@/lib/validation";
+import { CalendarIcon, RefreshCw, Users, Bell, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getRooms, getMinistries } from "@/actions/db";
@@ -216,6 +217,22 @@ export function BookingForm({ workerProfileId, onSubmit, isSubmitting = false }:
 
         if (!date || !startTime || !endTime || !roomId || !title) return;
 
+        if (title.trim().length > MAX_LENGTHS.TITLE) {
+            alert(`Event Title must not exceed ${MAX_LENGTHS.TITLE} characters.`);
+            return;
+        }
+
+        if (purpose && purpose.trim().length > 500) {
+            alert("Purpose must not exceed 500 characters.");
+            return;
+        }
+
+        const targetRoom = allRooms.find((r) => r.id === roomId);
+        if ((targetRoom as any)?.status === "Maintenance") {
+            alert(`Room "${targetRoom?.name || 'Selected'}" is currently under maintenance and cannot be reserved.`);
+            return;
+        }
+
         const [startH, startM] = startTime.split(":").map(Number);
         const [endH, endM] = endTime.split(":").map(Number);
 
@@ -275,22 +292,28 @@ export function BookingForm({ workerProfileId, onSubmit, isSubmitting = false }:
                         </Label>
                         <Input
                             id="title"
+                            maxLength={MAX_LENGTHS.TITLE}
                             value={title}
-                            onChange={(e) => setTitle(e.target.value)}
+                            onChange={(e) => setTitle(e.target.value.slice(0, MAX_LENGTHS.TITLE))}
                             placeholder="e.g., Sunday Service"
                             required
                         />
+                        <div className="flex justify-end">
+                        </div>
                     </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="purpose">Purpose / Description</Label>
                         <Textarea
                             id="purpose"
+                            maxLength={500}
                             value={purpose}
-                            onChange={(e) => setPurpose(e.target.value)}
+                            onChange={(e) => setPurpose(e.target.value.slice(0, 500))}
                             placeholder="Describe the event or meeting..."
                             className="min-h-[80px] resize-none"
                         />
+                        <div className="flex justify-end">
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -343,11 +366,23 @@ export function BookingForm({ workerProfileId, onSubmit, isSubmitting = false }:
                                     <SelectValue placeholder="Select room" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {filteredRooms.map((r) => (
-                                        <SelectItem key={r.id} value={r.id}>
-                                            {r.name}
-                                        </SelectItem>
-                                    ))}
+                                    {filteredRooms.map((r) => {
+                                        const isMaint = (r as any).status === 'Maintenance';
+                                        return (
+                                            <SelectItem key={r.id} value={r.id} disabled={isMaint}>
+                                                <div className="flex items-center justify-between w-full gap-2">
+                                                    <span className={cn(isMaint && "text-muted-foreground")}>
+                                                        {r.name}
+                                                    </span>
+                                                    {isMaint && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                                                            Maintenance
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        );
+                                    })}
                                 </SelectContent>
                             </Select>
                         </div>

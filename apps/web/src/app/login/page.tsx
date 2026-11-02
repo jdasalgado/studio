@@ -27,6 +27,7 @@ import { useAuthStore } from "@studio/store";
 import { supabase } from "@studio/database";
 import { validateLoginIdentifier } from "@/actions/legacy-auth";
 import { requestPasswordReset } from "@/actions/auth";
+import { recordAuthActivity } from "@/actions/db";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { useIsNativeApp } from "@/lib/native-app";
 
@@ -96,12 +97,26 @@ export default function LoginPage() {
 
       const loginEmail = validation.email || identifier.trim();
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password,
       });
 
       if (error) throw error;
+
+      if (authData?.user?.id && typeof window !== "undefined") {
+        sessionStorage.setItem(`cog_session_login_${authData.user.id}`, Date.now().toString());
+      }
+
+      try {
+        await recordAuthActivity("User Login", {
+          userId: authData?.user?.id || null,
+          email: loginEmail,
+          details: "User logged in successfully via Web",
+        });
+      } catch (logErr) {
+        console.warn('Failed to record login activity:', logErr);
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",

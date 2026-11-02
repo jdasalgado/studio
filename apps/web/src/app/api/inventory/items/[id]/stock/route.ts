@@ -5,7 +5,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
     const body = await req.json();
-    const { action, quantity = 1, notes, workerId } = body;
+    const { action, quantity = 1, notes, workerId, actorId, actorName, actorEmail } = body;
 
     const item = await prisma.inventoryItem.findUnique({ where: { id } });
     if (!item) {
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       prisma.inventoryLog.create({
         data: {
           itemId: id,
-          workerId: workerId || null,
+          workerId: workerId || actorId || null,
           type: action === 'Adjust' ? 'Adjustment' : action,
           quantity: action === 'Adjust' || action === 'Adjustment' ? Math.abs(newStock - item.quantity) : qty,
           balance: newStock,

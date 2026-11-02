@@ -7,6 +7,7 @@ import { useRoles } from "@/hooks/use-roles";
 import { useMinistries } from "@/hooks/use-ministries";
 import { useUserRole } from "@/hooks/use-user-role";
 import { useToast } from "@/hooks/use-toast";
+import { showSubmitSuccess, showSubmitError } from "@/hooks/use-submission-modal";
 import { LoaderCircle, ArrowLeft, ArrowRight, User, Building2, FileText, ClipboardCheck, CheckCircle2, Briefcase } from "lucide-react";
 import { createWorkerWithAuth } from "@/actions/db";
 import { useAuditLog } from "@/hooks/use-audit-log";
@@ -23,7 +24,7 @@ import {
   Checkbox,
 } from "@studio/ui";
 import { cn } from "@/lib/utils";
-import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail, isValidName, cleanName } from "@/lib/validation";
+import { isValidPhilippineNumber, cleanPhoneNumber, isValidEmail, isValidName, cleanName, MAX_LENGTHS } from "@/lib/validation";
 import type { Worker } from "@studio/types";
 
 // ── Step definitions ──────────────────────────────────────────────────────────
@@ -264,29 +265,37 @@ export default function NewWorkerPage() {
 
   const validateStep1 = () => {
     if (!firstName.trim()) { toast({ variant: "destructive", title: "First name is required" }); return false; }
-    if (!isValidName(firstName.trim())) {
+    if (!isValidName(firstName.trim(), 2, MAX_LENGTHS.FIRST_NAME)) {
       toast({
         variant: "destructive",
         title: "Invalid First Name",
-        description: "First name can only contain letters, spaces, hyphens, and apostrophes. Numbers are not allowed.",
+        description: `First name must contain only letters and not exceed ${MAX_LENGTHS.FIRST_NAME} characters.`,
       });
       return false;
     }
     if (!lastName.trim())  { toast({ variant: "destructive", title: "Last name is required" }); return false; }
-    if (!isValidName(lastName.trim())) {
+    if (!isValidName(lastName.trim(), 2, MAX_LENGTHS.LAST_NAME)) {
       toast({
         variant: "destructive",
         title: "Invalid Last Name",
-        description: "Last name can only contain letters, spaces, hyphens, and apostrophes. Numbers are not allowed.",
+        description: `Last name must contain only letters and not exceed ${MAX_LENGTHS.LAST_NAME} characters.`,
       });
       return false;
     }
     if (!email.trim())     { toast({ variant: "destructive", title: "Email is required" }); return false; }
-    if (!isValidEmail(email.trim())) {
+    if (!isValidEmail(email.trim(), MAX_LENGTHS.EMAIL)) {
       toast({
         variant: "destructive",
         title: "Invalid Email Address",
-        description: "Please enter a valid email format (e.g., name@example.com).",
+        description: `Please enter a valid email format (up to ${MAX_LENGTHS.EMAIL} characters).`,
+      });
+      return false;
+    }
+    if (address && address.trim().length > MAX_LENGTHS.ADDRESS) {
+      toast({
+        variant: "destructive",
+        title: "Address Too Long",
+        description: `Address must not exceed ${MAX_LENGTHS.ADDRESS} characters.`,
       });
       return false;
     }
@@ -321,11 +330,19 @@ export default function NewWorkerPage() {
       toast({ variant: "destructive", title: "Emergency contact name is required" });
       return false;
     }
-    if (!isValidName(emergencyName.trim())) {
+    if (!isValidName(emergencyName.trim(), 2, MAX_LENGTHS.EMERGENCY_NAME)) {
       toast({
         variant: "destructive",
         title: "Invalid Emergency Contact Name",
-        description: "Emergency contact name can only contain letters, spaces, hyphens, and apostrophes.",
+        description: `Emergency contact name can only contain letters and must not exceed ${MAX_LENGTHS.EMERGENCY_NAME} characters.`,
+      });
+      return false;
+    }
+    if (remarks && remarks.trim().length > 500) {
+      toast({
+        variant: "destructive",
+        title: "Remarks Too Long",
+        description: "Remarks must not exceed 500 characters.",
       });
       return false;
     }
@@ -404,18 +421,20 @@ export default function NewWorkerPage() {
       }
       await logAction("Created Worker", "Workers", `Created worker: ${firstName} ${lastName} (Terms v${termsAcceptedVersion} accepted)`, newWorker.id, `${firstName} ${lastName}`);
       if (newWorker.emailSent) {
-        toast({ 
-          title: "Worker Registered & Email Sent", 
-          description: `${firstName} ${lastName} added. Credentials and details sent to ${email}.` 
+        showSubmitSuccess({
+          title: "Worker Registered Successfully!",
+          description: `${firstName} ${lastName} has been added. Credentials and details were sent to ${email}.`,
+          confirmText: "View Workers",
+          onConfirm: () => router.push("/workers"),
         });
       } else {
-        toast({ 
-          variant: "destructive",
-          title: "Worker Added (Email Failed to Send)", 
-          description: `Worker was saved, but email could not be sent: ${newWorker.emailError || "Email delivery failed"}.` 
+        showSubmitSuccess({
+          title: "Worker Added Successfully",
+          description: `Worker was saved, but email could not be sent: ${newWorker.emailError || "Email delivery failed"}.`,
+          confirmText: "View Workers",
+          onConfirm: () => router.push("/workers"),
         });
       }
-      router.push("/workers");
     } catch (error: any) {
       const msg = error?.message?.includes("Minified React error #441")
         ? "Could not save worker profile. The email address may already be in use by another worker."
@@ -474,13 +493,13 @@ export default function NewWorkerPage() {
               {step === 1 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                   <Field label="First Name" required>
-                    <Input value={firstName} onChange={e => setFirstName(cleanName(e.target.value))} className="h-10 rounded-xl border-border/60 bg-background" />
+                    <Input maxLength={MAX_LENGTHS.FIRST_NAME} value={firstName} onChange={e => setFirstName(cleanName(e.target.value, MAX_LENGTHS.FIRST_NAME))} className="h-10 rounded-xl border-border/60 bg-background" />
                   </Field>
                   <Field label="Last Name" required>
-                    <Input value={lastName} onChange={e => setLastName(cleanName(e.target.value))} className="h-10 rounded-xl border-border/60 bg-background" />
+                    <Input maxLength={MAX_LENGTHS.LAST_NAME} value={lastName} onChange={e => setLastName(cleanName(e.target.value, MAX_LENGTHS.LAST_NAME))} className="h-10 rounded-xl border-border/60 bg-background" />
                   </Field>
                   <Field label="Email" required>
-                    <Input type="email" value={email} onChange={e => setEmail(e.target.value)} className="h-10 rounded-xl border-border/60 bg-background" />
+                    <Input type="email" maxLength={MAX_LENGTHS.EMAIL} value={email} onChange={e => setEmail(e.target.value.slice(0, MAX_LENGTHS.EMAIL))} className="h-10 rounded-xl border-border/60 bg-background" />
                   </Field>
                   <Field label="Mobile Number" required>
                     <Input
@@ -497,7 +516,7 @@ export default function NewWorkerPage() {
                     <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="h-10 rounded-xl border-border/60 bg-background" />
                   </Field>
                   <Field label="Address" required>
-                    <Input value={address} onChange={e => setAddress(e.target.value)} className="h-10 rounded-xl border-border/60 bg-background" />
+                    <Input maxLength={MAX_LENGTHS.ADDRESS} value={address} onChange={e => setAddress(e.target.value.slice(0, MAX_LENGTHS.ADDRESS))} className="h-10 rounded-xl border-border/60 bg-background" />
                   </Field>
                 </div>
               )}
@@ -699,8 +718,9 @@ export default function NewWorkerPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                     <Field label="Emergency contact name" required>
                       <Input 
+                        maxLength={MAX_LENGTHS.EMERGENCY_NAME}
                         value={emergencyName} 
-                        onChange={e => setEmergencyName(cleanName(e.target.value))} 
+                        onChange={e => setEmergencyName(cleanName(e.target.value, MAX_LENGTHS.EMERGENCY_NAME))} 
                         placeholder="e.g. Maria Santos"
                         className="h-10 rounded-xl border-border/60 bg-background" 
                       />

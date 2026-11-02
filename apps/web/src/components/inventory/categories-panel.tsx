@@ -123,7 +123,15 @@ export function CategoriesPanel() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('Category name is required');
+      setError('Category name is required. Please enter a category name.');
+      return;
+    }
+    if (name.trim().length > 50) {
+      setError('Category name must not exceed 50 characters.');
+      return;
+    }
+    if (description && description.trim().length > 250) {
+      setError('Category description must not exceed 250 characters.');
       return;
     }
 
@@ -413,9 +421,6 @@ export function CategoriesPanel() {
                   <span>Category Name</span>
                   <span className="text-destructive font-bold">*</span>
                 </Label>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {name.length}/50
-                </span>
               </div>
               <div className="relative">
                 <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -439,9 +444,10 @@ export function CategoriesPanel() {
               <div className="relative">
                 <AlignLeft className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <Input
+                  maxLength={250}
                   placeholder="e.g. Cables, batteries, stationery, adapters"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => setDescription(e.target.value.slice(0, 250))}
                   className="pl-9 h-9 text-xs rounded-xl bg-muted/30 border-border/70 focus:bg-background focus:ring-2 focus:ring-sidebar/20 transition-all"
                 />
               </div>

@@ -108,6 +108,11 @@
     @apply border-border;
   }
 
+  /* Default base font size increased by +1px (17px base) */
+  html {
+    font-size: 17px;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-size: calc(1rem * var(--font-scale, 1));
@@ -124,13 +129,13 @@
     -webkit-user-select: text;
   }
 
-  /* Form controls font size scaling (compact 12px / 0.75rem for crisp, clean inputs and search bars across the entire app) */
+  /* Form controls font size scaling (compact 13px / 0.8125rem for crisp, clean inputs and search bars across the entire app) */
   input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
   textarea,
   select,
   input::placeholder,
   textarea::placeholder {
-    font-size: calc(0.75rem * var(--font-scale, 1)) !important;
+    font-size: calc(0.8125rem * var(--font-scale, 1)) !important;
     font-family: inherit !important;
   }
 
@@ -218,6 +223,7 @@ body::-webkit-scrollbar {
 }
 
 html {
+  font-size: 17px;
   scroll-behavior: smooth;
   overflow-x: hidden;
 }
@@ -259,7 +265,7 @@ header .brand-title {
   font-size: 22px !important;
 }
 
-/* ── SIDEBAR & NAVIGATION FONT SCALING (16px default) ── */
+/* ── SIDEBAR & NAVIGATION FONT SCALING (17px default) ── */
 /* Menu buttons: Dashboard, Workers, Room Reservations, Configuration, Settings, etc. */
 [data-sidebar="menu-button"],
 [data-sidebar="sidebar"] [data-sidebar="menu-button"] {
@@ -274,7 +280,7 @@ header .brand-title {
 /* Sub-menu buttons: Display & Font Size, Change Password, etc. */
 [data-sidebar="menu-sub-button"],
 [data-sidebar="sidebar"] [data-sidebar="menu-sub-button"] {
-  font-size: calc(0.90625rem * var(--font-scale, 1)); /* 14.5px */
+  font-size: calc(0.96875rem * var(--font-scale, 1)); /* 15.5px */
 }
 
 [data-sidebar="menu-sub-button"] {
@@ -285,10 +291,10 @@ header .brand-title {
 /* Group labels (MENU) */
 [data-sidebar="group-label"],
 [data-sidebar="sidebar"] [data-sidebar="group-label"] {
-  font-size: calc(0.75rem * var(--font-scale, 1)); /* 12px */
+  font-size: calc(0.8125rem * var(--font-scale, 1)); /* 13px */
 }
 
-/* ── GLOBAL TYPOGRAPHY SCALING (Baseline: 16px / 1rem at Default) ── */
+/* ── GLOBAL TYPOGRAPHY SCALING (Baseline: 17px / 1rem at Default) ── */
 .text-xs { font-size: calc(0.75rem * var(--font-scale, 1)) !important; line-height: calc(1rem * var(--font-scale, 1)) !important; }
 .text-sm { font-size: calc(0.875rem * var(--font-scale, 1)) !important; line-height: calc(1.25rem * var(--font-scale, 1)) !important; }
 .text-base { font-size: calc(1rem * var(--font-scale, 1)) !important; line-height: calc(1.5rem * var(--font-scale, 1)) !important; }
@@ -299,24 +305,24 @@ header .brand-title {
 .text-4xl { font-size: calc(2.25rem * var(--font-scale, 1)) !important; line-height: calc(2.5rem * var(--font-scale, 1)) !important; }
 .text-5xl { font-size: calc(3rem * var(--font-scale, 1)) !important; }
 
-/* Arbitrary pixel sizes (scaled proportionally to 16px default) */
-.text-\[9px\] { font-size: calc(9px * var(--font-scale, 1)) !important; }
-.text-\[10px\] { font-size: calc(10px * var(--font-scale, 1)) !important; }
-.text-\[11px\] { font-size: calc(11px * var(--font-scale, 1)) !important; }
-.text-\[12px\] { font-size: calc(12px * var(--font-scale, 1)) !important; }
-.text-\[13px\] { font-size: calc(13px * var(--font-scale, 1)) !important; }
-.text-\[14px\] { font-size: calc(14px * var(--font-scale, 1)) !important; }
-.text-\[14\.5px\] { font-size: calc(14.5px * var(--font-scale, 1)) !important; }
-.text-\[15px\] { font-size: calc(15px * var(--font-scale, 1)) !important; }
-.text-\[16px\] { font-size: calc(16px * var(--font-scale, 1)) !important; }
-.text-\[18px\] { font-size: calc(18px * var(--font-scale, 1)) !important; }
-.text-\[20px\] { font-size: calc(20px * var(--font-scale, 1)) !important; }
-.text-\[22px\] { font-size: calc(22px * var(--font-scale, 1)) !important; }
-.text-\[24px\] { font-size: calc(24px * var(--font-scale, 1)) !important; }
-.text-\[28px\] { font-size: calc(28px * var(--font-scale, 1)) !important; }
-.text-\[32px\] { font-size: calc(32px * var(--font-scale, 1)) !important; }
+/* Arbitrary pixel sizes (scaled proportionally to default +1px) */
+.text-\[9px\] { font-size: calc(10px * var(--font-scale, 1)) !important; }
+.text-\[10px\] { font-size: calc(11px * var(--font-scale, 1)) !important; }
+.text-\[11px\] { font-size: calc(12px * var(--font-scale, 1)) !important; }
+.text-\[12px\] { font-size: calc(13px * var(--font-scale, 1)) !important; }
+.text-\[13px\] { font-size: calc(14px * var(--font-scale, 1)) !important; }
+.text-\[14px\] { font-size: calc(15px * var(--font-scale, 1)) !important; }
+.text-\[14\.5px\] { font-size: calc(15.5px * var(--font-scale, 1)) !important; }
+.text-\[15px\] { font-size: calc(16px * var(--font-scale, 1)) !important; }
+.text-\[16px\] { font-size: calc(17px * var(--font-scale, 1)) !important; }
+.text-\[18px\] { font-size: calc(19px * var(--font-scale, 1)) !important; }
+.text-\[20px\] { font-size: calc(21px * var(--font-scale, 1)) !important; }
+.text-\[22px\] { font-size: calc(23px * var(--font-scale, 1)) !important; }
+.text-\[24px\] { font-size: calc(25px * var(--font-scale, 1)) !important; }
+.text-\[28px\] { font-size: calc(29px * var(--font-scale, 1)) !important; }
+.text-\[32px\] { font-size: calc(33px * var(--font-scale, 1)) !important; }
 
-/* Form inputs & controls (16px / 1rem at Default) */
+/* Form inputs & controls (17px / 1rem at Default) */
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
 textarea,
 select {
@@ -344,7 +350,7 @@ textarea.text-\[11px\],
 select.text-\[11px\],
 input.text-\[11px\]::placeholder,
 textarea.text-\[11px\]::placeholder {
-  font-size: calc(11px * var(--font-scale, 1)) !important;
+  font-size: calc(12px * var(--font-scale, 1)) !important;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]).text-\[10px\],
@@ -353,7 +359,7 @@ textarea.text-\[10px\],
 select.text-\[10px\],
 input.text-\[10px\]::placeholder,
 textarea.text-\[10px\]::placeholder {
-  font-size: calc(10px * var(--font-scale, 1)) !important;
+  font-size: calc(11px * var(--font-scale, 1)) !important;
 }
 
 /* Ensure password inputs match normal text font family and size consistently */
@@ -365,4 +371,3 @@ table th,
 table td {
   font-size: calc(1rem * var(--font-scale, 1));
 }
-
