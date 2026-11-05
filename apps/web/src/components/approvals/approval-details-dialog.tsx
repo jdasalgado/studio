@@ -228,7 +228,7 @@ export function ApprovalDetailsDialog({
                 {request.requester}
               </p>
               <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                {reqDate ? format(reqDate, "MMM d, yyyy â€¢ h:mm a") : "â€”"}
+                {reqDate ? format(reqDate, "MMM d, yyyy • h:mm a") : "—"}
               </p>
             </div>
           </div>
@@ -348,7 +348,7 @@ export function ApprovalDetailsDialog({
                           Purpose
                         </p>
                         <p className="text-xs font-semibold text-foreground mt-0.5">
-                          {purpose || "â€”"}
+                          {purpose || "—"}
                         </p>
                       </div>
                     </>

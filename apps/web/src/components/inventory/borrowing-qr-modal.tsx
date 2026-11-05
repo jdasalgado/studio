@@ -87,39 +87,123 @@ export function BorrowingQRModal({ isOpen, onClose, borrowing }: BorrowingQRModa
     const html = `<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8" />
   <title>Borrowing Transaction Slip - ${borrowingCode}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; padding: 10mm; display: flex; justify-content: center; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      padding: 10mm;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     .slip {
-      width: 75mm;
-      padding: 5mm;
-      border: 2px dashed #0f172a;
+      width: 82mm;
+      max-width: 82mm;
+      padding: 6mm 5mm;
+      border: 1.5px solid #0f172a;
       border-radius: 4mm;
       text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 2mm;
+      background: #ffffff;
     }
-    .header { font-size: 8pt; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; }
-    .code { font-size: 11pt; font-family: monospace; font-weight: 900; color: #0f172a; margin: 1mm 0; }
-    .qr-img { width: 44mm; height: 44mm; object-fit: contain; }
-    .divider { width: 100%; border-top: 1px solid #e2e8f0; margin: 2mm 0; }
-    .details { width: 100%; font-size: 7.5pt; text-align: left; display: flex; flex-direction: column; gap: 1.5mm; }
-    .row { display: flex; justify-content: space-between; }
-    .label { color: #64748b; font-weight: 600; }
-    .val { color: #0f172a; font-weight: 700; text-align: right; }
-    .footer { font-size: 6.5pt; color: #94a3b8; margin-top: 2mm; text-align: center; }
+    .org-title {
+      font-size: 7pt;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .header {
+      font-size: 9.5pt;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 0.5mm;
+    }
+    .code {
+      font-size: 9pt;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 1.5mm 0;
+      background: #f1f5f9;
+      padding: 1mm 2.5mm;
+      border-radius: 1.5mm;
+    }
+    .qr-img {
+      width: 44mm;
+      height: 44mm;
+      object-fit: contain;
+      margin: 1mm auto;
+    }
+    .divider {
+      width: 100%;
+      border-top: 1px solid #e2e8f0;
+      margin: 2mm 0;
+    }
+    .details {
+      width: 100%;
+      font-size: 7.5pt;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 1.8mm;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 2mm;
+    }
+    .label {
+      color: #64748b;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .val {
+      color: #0f172a;
+      font-weight: 700;
+      text-align: right;
+      word-break: break-word;
+    }
+    .footer {
+      font-size: 6.5pt;
+      color: #94a3b8;
+      margin-top: 2mm;
+      text-align: center;
+      line-height: 1.3;
+    }
     @media print {
-      body { padding: 0; }
-      @page { size: auto; margin: 5mm; }
+      body {
+        padding: 0;
+        min-height: auto;
+      }
+      .slip {
+        margin: 10mm auto;
+      }
+      @page {
+        size: portrait;
+        margin: 10mm auto;
+      }
     }
   </style>
 </head>
 <body>
   <div class="slip">
-    <div class="header">COG App &bull; Borrowing Transaction QR</div>
+    <div class="org-title">COG APP &bull; Church Operations &amp; Governance</div>
+    <div class="header">Equipment Borrowing Slip</div>
     <div class="code">${borrowingCode}</div>
     <img src="${qrDataUrl}" alt="Borrowing QR" class="qr-img" />
     <div class="divider"></div>
@@ -133,7 +217,7 @@ export function BorrowingQRModal({ isOpen, onClose, borrowing }: BorrowingQRModa
       <div class="row"><span class="label">Status:</span><span class="val">${borrowing.status || 'BORROWED'}</span></div>
     </div>
     <div class="divider"></div>
-    <div class="footer">Scan with handheld scanner on return check-in. Transaction record only &bull; Do not use as Item QR.</div>
+    <div class="footer">Scan QR with handheld reader on item return check-in.<br/>Official Transaction Record &bull; Church Property</div>
   </div>
   <script>window.onload=()=>{ window.print(); window.close(); }</script>
 </body>

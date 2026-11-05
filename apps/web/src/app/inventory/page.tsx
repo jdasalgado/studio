@@ -196,7 +196,7 @@ function InventoryPageContent() {
     <AppLayout>
       <div className="space-y-6">
         {/* ── TOP HEADER ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 print:hidden">
           <div className="space-y-0.5 sm:space-y-1">
             <h1 className="text-3xl font-bold font-headline tracking-tight text-gray-900 dark:text-white leading-tight flex items-center gap-2.5 flex-wrap">
               {activeTab === "items"
@@ -262,7 +262,7 @@ function InventoryPageContent() {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {/* ── OVERDUE BANNER ALERT ── */}
           {overdueAlerts.length > 0 && (
-            <div className="p-4 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-between flex-wrap gap-3 animate-in fade-in">
+            <div className="p-4 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-between flex-wrap gap-3 animate-in fade-in print:hidden">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-xl bg-destructive/20 flex items-center justify-center shrink-0">
                   <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -288,7 +288,7 @@ function InventoryPageContent() {
           )}
 
           {/* ── TOP KPI SUMMARY CARDS (DYNAMIC PER TAB) ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
             {/* TAB: ITEMS & CATALOG */}
             {activeTab === 'items' && (
               <>

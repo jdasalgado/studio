@@ -69,52 +69,103 @@ export function QRModal({ isOpen, onClose, item, items }: QRModalProps) {
     const html = `<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8" />
   <title>QR Labels</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', Arial, sans-serif; background: #fff; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    ${isBatch ? `
     .label-grid {
       display: grid;
-      grid-template-columns: repeat(4, 50.8mm);
-      gap: 0;
-      padding: 5mm;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5mm;
+      padding: 6mm;
     }
     .label {
-      width: 50.8mm;
-      height: 50.8mm;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 3mm;
-      border: 0.5pt solid #ddd;
+      padding: 4mm 3mm;
+      border: 1px solid #cbd5e1;
+      border-radius: 3mm;
       page-break-inside: avoid;
+      break-inside: avoid;
       text-align: center;
-      gap: 2mm;
+      background: #ffffff;
     }
     .label img {
-      width: 30mm;
-      height: 30mm;
+      width: 36mm;
+      height: 36mm;
       object-fit: contain;
     }
     .label-name {
-      font-size: 7pt;
-      font-weight: 700;
-      color: #1a1a2e;
+      font-size: 8.5pt;
+      font-weight: 800;
+      color: #0f172a;
       line-height: 1.2;
-      max-width: 44mm;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      margin-top: 2mm;
+      max-width: 90%;
+      word-break: break-word;
     }
     .label-code {
-      font-size: 6pt;
-      color: #6b7280;
-      font-family: monospace;
+      font-size: 7pt;
+      color: #64748b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 700;
+      margin-top: 1mm;
+      letter-spacing: 0.5px;
     }
+    ` : `
+    .label-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      padding: 20mm 10mm;
+    }
+    .label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6mm;
+      text-align: center;
+      background: #ffffff;
+      max-width: 90mm;
+    }
+    .label img {
+      width: 55mm;
+      height: 55mm;
+      object-fit: contain;
+    }
+    .label-name {
+      font-size: 13pt;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      margin-top: 4mm;
+      word-break: break-word;
+    }
+    .label-code {
+      font-size: 8.5pt;
+      color: #64748b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 700;
+      margin-top: 1.5mm;
+      letter-spacing: 0.5px;
+    }
+    `}
     @media print {
-      @page { size: A4; margin: 5mm; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      @page { size: A4 portrait; margin: 8mm; }
+      body { padding: 0; }
     }
   </style>
 </head>

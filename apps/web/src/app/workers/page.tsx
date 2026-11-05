@@ -953,11 +953,16 @@ export default function WorkersPage() {
                       >
                         {/* Blue header: Checkbox + Worker ID + Status + Actions Menu */}
                         <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-sidebar">
-                          <div className="flex items-center gap-2.5">
+                          <div 
+                            className="flex items-center gap-2.5 cursor-pointer select-none py-0.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSelectWorker(worker.id);
+                            }}
+                          >
                             <Checkbox
                               checked={isChecked}
-                              onCheckedChange={() => toggleSelectWorker(worker.id)}
-                              className="h-[17px] w-[17px] rounded-[4px] border-[1.5px] border-white/90 bg-transparent data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-sidebar focus-visible:ring-0 cursor-pointer shadow-xs transition-colors"
+                              className="h-[18px] w-[18px] rounded-[4px] border-[1.5px] border-white/90 bg-transparent data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-sidebar focus-visible:ring-0 pointer-events-none shadow-xs transition-colors"
                             />
                             <span className="text-xs font-mono font-bold text-white">
                               {workerIdFormatted}
@@ -1089,12 +1094,14 @@ export default function WorkersPage() {
                 <table className="w-full">
                   <thead className="bg-sidebar">
                     <tr className="bg-sidebar hover:bg-sidebar border-b border-sidebar-border/40">
-                      <th className="w-10 px-4 py-3.5 text-center">
-                        <div className="flex items-center justify-center">
+                      <th 
+                        className="w-12 px-4 py-3.5 text-center cursor-pointer select-none"
+                        onClick={() => toggleSelectAll(displayedWorkers)}
+                      >
+                        <div className="flex items-center justify-center p-0.5">
                           <Checkbox
-                            className="h-[17px] w-[17px] rounded-[4px] border-[1.5px] border-white/90 bg-transparent data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-sidebar focus-visible:ring-0 cursor-pointer shadow-xs transition-colors"
+                            className="h-[18px] w-[18px] rounded-[4px] border-[1.5px] border-white/90 bg-transparent data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-sidebar focus-visible:ring-0 pointer-events-none shadow-xs transition-colors"
                             checked={displayedWorkers.length > 0 && displayedWorkers.every(w => selectedWorkerIds.includes(w.id))}
-                            onCheckedChange={() => toggleSelectAll(displayedWorkers)}
                           />
                         </div>
                       </th>
@@ -1136,12 +1143,17 @@ export default function WorkersPage() {
                             isSelected ? "bg-primary/5" : "hover:bg-slate-50/70 dark:hover:bg-muted/30"
                           )}
                         >
-                          <td className="px-4 py-3.5 text-center" onClick={e => { e.stopPropagation(); toggleSelectWorker(worker.id); }}>
-                            <div className="flex items-center justify-center">
+                          <td 
+                            className="w-12 px-4 py-3.5 text-center cursor-pointer select-none" 
+                            onClick={e => { 
+                              e.stopPropagation(); 
+                              toggleSelectWorker(worker.id); 
+                            }}
+                          >
+                            <div className="flex items-center justify-center p-0.5">
                               <Checkbox
-                                className="h-[17px] w-[17px] rounded-[4px] border-slate-300 dark:border-slate-600 data-[state=checked]:bg-sidebar data-[state=checked]:border-sidebar cursor-pointer transition-colors"
+                                className="h-[18px] w-[18px] rounded-[4px] border-slate-300 dark:border-slate-600 data-[state=checked]:bg-sidebar data-[state=checked]:border-sidebar pointer-events-none transition-colors shadow-2xs"
                                 checked={isSelected}
-                                onCheckedChange={() => toggleSelectWorker(worker.id)}
                               />
                             </div>
                           </td>
@@ -1214,21 +1226,30 @@ export default function WorkersPage() {
               </div>
 
               {/* Pagination */}
-              {pagination && pagination.total > 0 && (
+              {pagination && (pagination.total || displayedWorkers.length) > 0 && (
                 <div className="px-6 py-4 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <p className="text-xs text-muted-foreground">
-                    Showing {displayedWorkers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}–{Math.min(currentPage * itemsPerPage, displayedWorkers.length)} of {displayedWorkers.length.toLocaleString()} {isMinistryHeadScoped ? "mentors" : "workers"}
+                    Showing {displayedWorkers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}–{Math.min(currentPage * itemsPerPage, pagination.total || displayedWorkers.length)} of {(pagination.total || displayedWorkers.length).toLocaleString()} {isMinistryHeadScoped ? "mentors" : "workers"}
                   </p>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                      className="h-8 w-8 flex items-center justify-center rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:pointer-events-none transition-colors shadow-2xs font-bold text-sm">
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 flex items-center justify-center rounded-xl border border-border text-foreground hover:bg-muted/60 disabled:opacity-30 disabled:pointer-events-none transition-colors shadow-2xs font-bold text-sm cursor-pointer"
+                      title="Previous page"
+                    >
                       ‹
                     </button>
-                    <button onClick={() => setIsBatchDeleteDialogOpen(true)} className="h-7 px-2.5 flex items-center gap-1.5 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer">
-                      <Trash2 className="h-3 w-3" /> Delete
-                    </button>
-                    <button onClick={() => setSelectedWorkerIds([])} className="h-7 px-2.5 flex items-center gap-1.5 rounded-lg border border-border/60 text-muted-foreground text-xs font-semibold hover:bg-muted/40 transition-colors cursor-pointer">
-                      <X className="h-3 w-3" /> Clear
+                    <span className="text-xs font-semibold px-2 text-muted-foreground">
+                      Page {currentPage} of {pagination.totalPages || Math.ceil((pagination.total || displayedWorkers.length) / itemsPerPage) || 1}
+                    </span>
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.min(pagination.totalPages || Math.ceil((pagination.total || displayedWorkers.length) / itemsPerPage) || 1, p + 1))} 
+                      disabled={currentPage >= (pagination.totalPages || Math.ceil((pagination.total || displayedWorkers.length) / itemsPerPage) || 1)}
+                      className="h-8 w-8 flex items-center justify-center rounded-xl border border-border text-foreground hover:bg-muted/60 disabled:opacity-30 disabled:pointer-events-none transition-colors shadow-2xs font-bold text-sm cursor-pointer"
+                      title="Next page"
+                    >
+                      ›
                     </button>
                   </div>
                 </div>
@@ -1237,6 +1258,43 @@ export default function WorkersPage() {
           </div>
         </div>
       </div>
+
+      {/* ── FLOATING BATCH ACTIONS BAR ── */}
+      {selectedWorkerIds.length > 0 && (
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="rounded-2xl border border-slate-200/90 dark:border-border bg-white/95 dark:bg-card/95 backdrop-blur-md shadow-2xl p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="bg-sidebar text-white rounded-xl px-2.5 py-1 text-xs font-bold font-mono shadow-xs">
+                {selectedWorkerIds.length}
+              </span>
+              <span className="text-xs font-semibold text-foreground">
+                {selectedWorkerIds.length === 1 ? "Worker selected" : "Workers selected"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setIsBatchDeleteDialogOpen(true)}
+                className="h-8 px-3 rounded-xl text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedWorkerIds([])}
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                title="Clear selection"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sheets & Dialogs */}
       <AlertDialog open={isBatchDeleteDialogOpen} onOpenChange={setIsBatchDeleteDialogOpen}>

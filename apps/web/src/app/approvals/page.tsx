@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useMemo, useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -33,6 +33,20 @@ import {
 } from "@studio/ui";
 
 // â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Fix mojibake: UTF-8 chars misread as Latin-1
+function fixMojibake(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .replace(/\u00e2\u0080\u0093/g, '\u2013')
+    .replace(/\u00e2\u0080\u0094/g, '\u2014')
+    .replace(/\u00e2\u0080\u00a2/g, '\u2022')
+    .replace(/\u00e2\u0080\u0098/g, '\u2018')
+    .replace(/\u00e2\u0080\u0099/g, '\u2019')
+    .replace(/\u00e2\u0080\u009c/g, '\u201c')
+    .replace(/\u00e2\u0080\u009d/g, '\u201d')
+    .replace(/\u00e2\u0080\u00a6/g, '\u2026')
+    .replace(/\u00c2\u00a0/g, ' ');
+}
 function StatusBadge({ status }: { status: string }) {
   if (status === "Approved")
     return (
@@ -252,7 +266,7 @@ export default function ApprovalsPage() {
     });
   }, [roomBookingRequests, isSuperAdmin, workerProfile, allMinistries, ministries, bookings, workers]);
 
-  // Filtered requests by search and status â€” sorted by most recent reservation requested first (submission time)
+  // Filtered requests by search and status — sorted by most recent reservation requested first (submission time)
   const filteredRequests = useMemo(() => {
     let results = [...scopedRequests];
 
@@ -352,7 +366,7 @@ export default function ApprovalsPage() {
 
       // 2. If the request was submitted by an Admin:
       // "hindi na din dapat dadaan sa Ministry head ung request ni admin"
-      // Ministry Heads cannot approve or manage Admin requests at all â€” only Admin can!
+      // Ministry Heads cannot approve or manage Admin requests at all — only Admin can!
       if (isRequesterAdmin && !isAdmin) {
         return false;
       }
@@ -612,18 +626,21 @@ export default function ApprovalsPage() {
                     const ministry = targetMinistryId
                       ? (allMinistries || ministries)?.find(m => m.id === targetMinistryId)
                       : null;
-                    const room = rooms?.find((r) => r.id === booking?.roomId);
+                    const room = rooms?.find((r) => r.id === (req.roomId || booking?.roomId)) || (booking as any)?.room;
                     const area = areas?.find((a) => a.id === room?.areaId);
-                    let purposeText = booking?.purpose || booking?.title;
-                    if (!purposeText && req.details) {
+                    let roomName = fixMojibake(room?.name);
+                    let purposeText = fixMojibake(booking?.purpose || booking?.title);
+                    if (req.details) {
                       const match = req.details.match(/^"?(.*?)"?\s+for room:\s*(.*)$/i);
                       if (match) {
-                        purposeText = match[1];
-                      } else {
-                        purposeText = req.details;
+                        if (!purposeText) purposeText = fixMojibake(match[1]);
+                        if (!roomName && match[2]) roomName = fixMojibake(match[2]);
+                      } else if (!purposeText) {
+                        purposeText = fixMojibake(req.details);
                       }
                     }
-                    if (!purposeText) purposeText = "â€”";
+                    if (!roomName) roomName = "—";
+                    if (!purposeText) purposeText = "—";
 
                     const reqId = req.id || "";
                     const reqDate = booking?.dateRequested
@@ -683,7 +700,7 @@ export default function ApprovalsPage() {
                                   {req.requester}
                                 </span>
                                 <span className="text-[11px] text-muted-foreground block truncate">
-                                  {ministry?.name || "â€”"}
+                                  {fixMojibake(ministry?.name) || "—"}
                                 </span>
                               </div>
                             </div>
@@ -707,7 +724,7 @@ export default function ApprovalsPage() {
                                 Room
                               </p>
                               <p className="font-semibold text-foreground truncate">
-                                {room?.name || "â€”"}
+                                {roomName}
                               </p>
                               <p className="text-muted-foreground text-[11px] truncate">
                                 {area?.name || "First Floor"}
@@ -723,7 +740,7 @@ export default function ApprovalsPage() {
                                     {format(new Date(booking.start), "MMM d, yyyy")}
                                   </p>
                                   <p className="text-muted-foreground text-[11px]">
-                                    {format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
+                                    {format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
                                   </p>
                                 </>
                               ) : reqDate ? (
@@ -731,7 +748,7 @@ export default function ApprovalsPage() {
                                   {format(reqDate, "MMM d, yyyy")}
                                 </p>
                               ) : (
-                                <p className="text-muted-foreground">â€”</p>
+                                <p className="text-muted-foreground">—</p>
                               )}
                             </div>
                             <div>
@@ -739,7 +756,7 @@ export default function ApprovalsPage() {
                                 Ministry
                               </p>
                               <p className="font-semibold text-foreground truncate">
-                                {ministry?.name || "â€”"}
+                                {fixMojibake(ministry?.name) || "—"}
                               </p>
                             </div>
                             <div>
@@ -747,7 +764,7 @@ export default function ApprovalsPage() {
                                 Created
                               </p>
                               <p className="font-semibold text-foreground truncate">
-                                {reqDate ? format(reqDate, "MMM d, yyyy") : "â€”"}
+                                {reqDate ? format(reqDate, "MMM d, yyyy") : "—"}
                               </p>
                             </div>
                           </div>
@@ -804,18 +821,20 @@ export default function ApprovalsPage() {
                     filteredRequests.map(req => {
                       const worker = workers?.find(w => w.id === req.workerId);
                       const booking = bookings?.find(b => b.id === req.reservationId);
-                      const room = rooms?.find(r => r.id === (req.roomId || booking?.roomId));
-                      const roomName = room?.name || "â€”";
-                      let purposeText = booking?.purpose || booking?.title;
-                      if (!purposeText && req.details) {
+                      const room = rooms?.find(r => r.id === (req.roomId || booking?.roomId)) || (booking as any)?.room;
+                      let roomName = fixMojibake(room?.name);
+                      let purposeText = fixMojibake(booking?.purpose || booking?.title);
+                      if (req.details) {
                         const match = req.details.match(/^"?(.*?)"?\s+for room:\s*(.*)$/i);
                         if (match) {
-                          purposeText = match[1];
-                        } else {
-                          purposeText = req.details;
+                          if (!purposeText) purposeText = fixMojibake(match[1]);
+                          if (!roomName && match[2]) roomName = fixMojibake(match[2]);
+                        } else if (!purposeText) {
+                          purposeText = fixMojibake(req.details);
                         }
                       }
-                      if (!purposeText) purposeText = "â€”";
+                      if (!roomName) roomName = "—";
+                      if (!purposeText) purposeText = "—";
 
                       const targetMinistryId = booking?.ministryId || worker?.majorMinistryId || req.newMajorId || req.oldMajorId;
                       const ministry = targetMinistryId
@@ -852,7 +871,7 @@ export default function ApprovalsPage() {
                               </div>
                             </td>
                             <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap font-medium">
-                              {ministry?.name || "â€”"}
+                              {fixMojibake(ministry?.name) || "—"}
                             </td>
                             <td className="px-5 py-3.5 whitespace-nowrap">
                               {booking?.start ? (
@@ -863,7 +882,7 @@ export default function ApprovalsPage() {
                                   <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
                                     <Clock className="h-3 w-3 text-slate-400 shrink-0" />
                                     <span>
-                                      {format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
+                                      {format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
                                     </span>
                                   </p>
                                 </div>
@@ -874,7 +893,7 @@ export default function ApprovalsPage() {
                                   </p>
                                 </div>
                               ) : (
-                                <span className="text-xs text-muted-foreground font-medium">â€”</span>
+                                <span className="text-xs text-muted-foreground font-medium">—</span>
                               )}
                             </td>
                             <td className="px-5 py-3.5 text-center whitespace-nowrap">
@@ -957,7 +976,7 @@ export default function ApprovalsPage() {
                         <Initials name={req.requester} />
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-foreground leading-tight truncate">{req.requester}</p>
-                          <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{ministry?.name || "â€”"}</p>
+                          <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{fixMojibake(ministry?.name) || "—"}</p>
                         </div>
                       </div>
                       <StatusBadge status={req.status} />
@@ -976,9 +995,9 @@ export default function ApprovalsPage() {
                       <div className="mt-2.5 flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                         <Clock className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                         <span className="font-semibold text-foreground">{format(new Date(booking.start), "MMM d, yyyy")}</span>
-                        <span>â€¢</span>
+                        <span>•</span>
                         <span className="text-slate-600 dark:text-slate-300">
-                          {format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
+                          {format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}
                         </span>
                       </div>
                     ) : req.date ? (
@@ -988,7 +1007,7 @@ export default function ApprovalsPage() {
                       </div>
                     ) : null}
 
-                    {/* Action buttons â€” always at bottom */}
+                    {/* Action buttons — always at bottom */}
                     <div className="mt-auto pt-4 border-t border-slate-200/80 dark:border-border/60 flex items-center gap-2" onClick={e => e.stopPropagation()}>
                       {canManage && isPending ? (
                         <>
@@ -1075,7 +1094,7 @@ export default function ApprovalsPage() {
                             <Initials name={req.requester} />
                             <div>
                               <p className="text-sm font-bold text-foreground leading-tight">{req.requester}</p>
-                              <p className="text-[11px] text-muted-foreground">{ministry?.name || "â€”"}</p>
+                              <p className="text-[11px] text-muted-foreground">{fixMojibake(ministry?.name) || "—"}</p>
                             </div>
                           </div>
 
@@ -1090,8 +1109,8 @@ export default function ApprovalsPage() {
                             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                               <Clock className="h-3 w-3 text-slate-500 shrink-0" />
                               <span className="font-semibold text-foreground">{format(new Date(booking.start), "MMM d, yyyy")}</span>
-                              <span>â€¢</span>
-                              <span>{format(new Date(booking.start), "h:mm a")} â€“ {booking.end ? format(new Date(booking.end), "h:mm a") : ""}</span>
+                              <span>•</span>
+                              <span>{format(new Date(booking.start), "h:mm a")} – {booking.end ? format(new Date(booking.end), "h:mm a") : ""}</span>
                             </div>
                           ) : req.date ? (
                             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">

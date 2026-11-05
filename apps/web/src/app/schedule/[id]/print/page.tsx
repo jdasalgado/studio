@@ -39,33 +39,36 @@ export default async function PrintSchedulePage({ params }: { params: Promise<{ 
 
     const css = `
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Georgia, serif; color: #111; padding: 32px; max-width: 820px; margin: 0 auto; }
-        h1 { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
-        .meta { font-size: 13px; color: #555; margin-bottom: 4px; }
-        .status-badge { display: inline-block; font-size: 11px; font-weight: bold;
-            padding: 2px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1; margin-bottom: 20px; }
-        .section-title { font-size: 11px; font-weight: bold; text-transform: uppercase;
-            letter-spacing: 0.08em; color: #888; margin: 28px 0 12px;
-            border-bottom: 2px solid #111; padding-bottom: 4px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 32px; max-width: 820px; margin: 0 auto; background: #fff; }
+        h1 { font-size: 24px; font-weight: 800; margin-bottom: 6px; color: #0f172a; letter-spacing: -0.02em; }
+        .meta { font-size: 13px; color: #475569; margin-bottom: 4px; font-weight: 500; }
+        .status-badge { display: inline-block; font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 6px; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; margin-top: 6px; margin-bottom: 24px; }
+        .section-title { font-size: 11px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 0.08em; color: #0f172a; margin: 24px 0 12px;
+            border-bottom: 2px solid #0f172a; padding-bottom: 4px; }
         .ministry { margin-bottom: 20px; break-inside: avoid; }
-        .ministry-name { font-size: 13px; font-weight: bold; text-transform: uppercase;
-            letter-spacing: 0.05em; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 8px; }
-        .role-name { font-size: 11px; font-weight: bold; color: #555; margin: 8px 0 3px;
+        .ministry-name { font-size: 13px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; color: #1e3a8a; }
+        .role-name { font-size: 11px; font-weight: 700; color: #64748b; margin: 8px 0 3px;
             text-transform: uppercase; letter-spacing: 0.04em; }
-        .slot { display: flex; align-items: center; gap: 8px; padding: 3px 0;
-            border-bottom: 1px dotted #e5e5e5; font-size: 13px; }
-        .slot-name { flex: 1; }
-        .slot-empty { color: #bbb; font-style: italic; }
-        .confirmed { font-size: 11px; color: #16a34a; }
-        .not-attending { font-size: 11px; color: #dc2626; }
-        .pending { font-size: 11px; color: #d97706; }
-        .slot-card { border: 1px solid #ddd; border-radius: 6px; padding: 12px 14px; margin-bottom: 12px; break-inside: avoid; }
-        .slot-card-title { font-size: 14px; font-weight: bold; margin-bottom: 8px; }
-        .print-btn { margin-bottom: 24px; padding: 8px 20px; cursor: pointer;
-            background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 14px; }
+        .slot { display: flex; align-items: center; gap: 8px; padding: 5px 0;
+            border-bottom: 1px dotted #e2e8f0; font-size: 13px; }
+        .slot-name { flex: 1; font-weight: 600; color: #1e293b; }
+        .slot-empty { color: #94a3b8; font-style: italic; }
+        .confirmed { font-size: 11px; color: #16a34a; font-weight: 700; }
+        .not-attending { font-size: 11px; color: #dc2626; font-weight: 700; }
+        .pending { font-size: 11px; color: #d97706; font-weight: 700; }
+        .slot-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; break-inside: avoid; background: #f8fafc; }
+        .slot-card-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; color: #0f172a; text-transform: uppercase; }
+        .print-btn { margin-bottom: 24px; padding: 10px 22px; cursor: pointer;
+            background: #0f172a; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; }
         @media print {
-            body { padding: 16px; }
-            .print-btn { display: none; }
+            @page { size: portrait; margin: 12mm; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body { padding: 0; }
+            .print-btn { display: none !important; }
+            .slot-card { background: transparent !important; }
         }
     `;
 
@@ -77,9 +80,14 @@ export default async function PrintSchedulePage({ params }: { params: Promise<{ 
                 <style dangerouslySetInnerHTML={{ __html: css }} />
             </head>
             <body>
-                <button className="print-btn" onClick={() => window.print()}>
+                <button id="printBtn" className="print-btn">
                     🖨 Print / Save as PDF
                 </button>
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `document.getElementById('printBtn')?.addEventListener('click', () => window.print());`,
+                    }}
+                />
 
                 <h1>{schedule.title}</h1>
                 <div className="meta">{format(new Date(schedule.date), "EEEE, MMMM d, yyyy")}</div>

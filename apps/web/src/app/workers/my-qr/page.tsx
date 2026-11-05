@@ -152,9 +152,9 @@ export default function MyQRCodePage() {
 
   return (
     <AppLayout>
-      <div className="w-full space-y-6 pb-12">
+      <div className="w-full space-y-6 pb-12 print:pb-0 print:space-y-0">
         {/* Header Section (Room Reservations Style) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
           <div className="space-y-1">
             <h1 className="text-3xl font-bold font-headline tracking-tight text-gray-900 dark:text-white">
               My QR Code
@@ -188,25 +188,30 @@ export default function MyQRCodePage() {
         </div>
 
         {/* Main Card Container with Entrance Animation */}
-        <div className="bg-card rounded-2xl border border-border/60 shadow-card-dark p-5 sm:p-6 md:p-8 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-card rounded-2xl border border-border/60 shadow-card-dark p-5 sm:p-6 md:p-8 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 print:border-none print:shadow-none print:p-0 print:bg-transparent print:m-0 print:overflow-visible">
           {/* Main Grid: Digital Pass & Credential Overview */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start print:block print:w-full">
             {/* Left Column: Digital Pass Badge Card */}
-            <div className="lg:col-span-6 flex justify-center w-full">
-              <div className="w-full max-w-md bg-slate-50/70 dark:bg-muted/20 border border-slate-200/80 dark:border-border/80 rounded-2xl p-6 sm:p-7 text-center space-y-5 shadow-xs relative overflow-hidden">
+            <div className="lg:col-span-6 flex justify-center w-full print:w-full print:max-w-none print:m-0 print:flex print:flex-col print:items-center">
+              {/* Cutting Guide for Standard ID Sleeve */}
+              <div className="hidden print:block text-center text-[9px] text-slate-400 font-mono mb-2">
+                ✂ Cut along the outer border to fit standard ID lanyard holder / badge sleeve (88mm × 135mm)
+              </div>
+
+              <div className="print-badge-card w-full max-w-md bg-slate-50/70 dark:bg-muted/20 border border-slate-200/80 dark:border-border/80 rounded-2xl p-6 sm:p-7 text-center space-y-5 shadow-xs relative overflow-hidden print:bg-white print:border-2 print:border-slate-900 print:rounded-2xl print:p-6 print:space-y-4 print:shadow-none">
                 {/* Decorative Subtle Accent Bar */}
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-sidebar via-primary to-sidebar" />
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-sidebar via-primary to-sidebar print:bg-slate-900" />
 
                 {/* Identification Header */}
                 <div className="space-y-1.5 pt-1">
-                  <div className="bg-primary/10 dark:bg-primary/20 text-primary p-2.5 rounded-xl mx-auto w-fit border border-primary/20 shadow-xs flex items-center justify-center">
-                    <QrCode className="h-7 w-7" />
+                  <div className="bg-primary/10 dark:bg-primary/20 text-primary p-2.5 rounded-xl mx-auto w-fit border border-primary/20 shadow-xs flex items-center justify-center print:border-slate-300 print:text-slate-900 print:bg-slate-100 print:p-2">
+                    <QrCode className="h-7 w-7 print:h-6 print:w-6" />
                   </div>
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-headline font-bold text-gray-900 dark:text-white tracking-tight">
+                    <h2 className="text-xl sm:text-2xl font-headline font-bold text-gray-900 dark:text-white tracking-tight print:text-slate-900 print:text-lg">
                       COG App Identification
                     </h2>
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5 print:text-slate-600 print:text-[9.5px]">
                       Church Operations & Governance
                     </p>
                   </div>
@@ -215,7 +220,7 @@ export default function MyQRCodePage() {
                 {/* QR Code Container */}
                 <div className="flex justify-center">
                   {combinedQrUrl ? (
-                    <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl shadow-xs border border-slate-200/90 dark:border-border inline-block overflow-hidden max-w-[270px] sm:max-w-[300px] w-full aspect-square">
+                    <div className="bg-white dark:bg-card p-4 sm:p-5 rounded-2xl shadow-xs border border-slate-200/90 dark:border-border inline-block overflow-hidden max-w-[270px] sm:max-w-[300px] w-full aspect-square print:p-2.5 print:max-w-[195px] print:rounded-xl print:border-slate-300 print:shadow-none">
                       <Image
                         key={activeToken}
                         src={combinedQrUrl}
@@ -223,7 +228,7 @@ export default function MyQRCodePage() {
                         width={300}
                         height={300}
                         unoptimized
-                        className="rounded-lg w-full h-full object-contain"
+                        className="rounded-lg w-full h-full object-contain print:rounded-none"
                       />
                     </div>
                   ) : (
@@ -234,12 +239,13 @@ export default function MyQRCodePage() {
                 </div>
 
                 {/* User Profile Summary */}
-                <div className="space-y-2 border-t border-slate-200/70 dark:border-border/60 pt-4">
-                  <h3 className="text-lg font-bold font-headline text-gray-900 dark:text-white">
+                <div className="space-y-2 border-t border-slate-200/70 dark:border-border/60 pt-4 print:pt-3 print:space-y-1.5 print:border-slate-200">
+                  <h3 className="text-lg font-bold font-headline text-gray-900 dark:text-white print:text-slate-900 print:text-base">
                     {workerProfile?.firstName || user?.name || "System"}{" "}
                     {workerProfile?.lastName || "User"}
                   </h3>
-                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {/* Role Badge and Worker ID — hidden on print */}
+                  <div className="flex items-center justify-center gap-2 flex-wrap print:hidden">
                     <Badge className="bg-sidebar text-white hover:bg-sidebar/90 text-[11px] font-semibold px-2.5 py-0.5 rounded-md capitalize">
                       {roleName}
                     </Badge>
@@ -250,7 +256,14 @@ export default function MyQRCodePage() {
                     )}
                   </div>
 
-                  {/* Regenerate Button directly below role badge */}
+                  {/* Ministry Name — hidden on print */}
+                  {userMinistry?.name && (
+                    <p className="text-[11px] text-muted-foreground font-semibold print:hidden">
+                      {userMinistry.name}
+                    </p>
+                  )}
+
+                  {/* Regenerate Button directly below role badge — hidden on print */}
                   <div className="pt-1.5 flex justify-center print:hidden">
                     <Button
                       variant="default"
@@ -270,8 +283,8 @@ export default function MyQRCodePage() {
                   </div>
                 </div>
 
-                {/* Authorized Ecosystem Pills */}
-                <div className="grid grid-cols-2 gap-2 text-xs font-semibold pt-1">
+                {/* Authorized Ecosystem Pills — hidden on print */}
+                <div className="grid grid-cols-2 gap-2 text-xs font-semibold pt-1 print:hidden">
                   <div className="p-2.5 bg-white dark:bg-card rounded-xl border border-slate-200/80 dark:border-border/60 flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-300 shadow-2xs">
                     <span>📅</span> Attendance
                   </div>
@@ -279,11 +292,21 @@ export default function MyQRCodePage() {
                     <span>🍽️</span> Meal Stubs
                   </div>
                 </div>
+
+                {/* Print-Only Official Card Verification Footer */}
+                <div className="hidden print:block pt-3 border-t border-slate-200 text-center space-y-0.5">
+                  <p className="text-[8.5px] font-bold tracking-widest text-slate-800 uppercase">
+                    Official Digital ID Pass
+                  </p>
+                  <p className="text-[7.5px] text-slate-500">
+                    Church Operations &amp; Governance &bull; Non-Transferable &bull; Valid for System Verification
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* Right Column: Information Cards & Credentials */}
-            <div className="lg:col-span-6 space-y-4">
+            <div className="lg:col-span-6 space-y-4 print:hidden">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-0.5">
                   <h3 className="text-base font-bold font-headline text-foreground">
@@ -363,7 +386,7 @@ export default function MyQRCodePage() {
         </div>
 
         {/* Footer Note */}
-        <div className="text-center text-xs text-muted-foreground opacity-60 uppercase tracking-widest pt-2 font-semibold">
+        <div className="text-center text-xs text-muted-foreground opacity-60 uppercase tracking-widest pt-2 font-semibold print:hidden">
           Property of Church Operations and Governance &bull; Official Digital Identification
         </div>
       </div>
@@ -418,22 +441,104 @@ export default function MyQRCodePage() {
       {/* Print Stylesheet */}
       <style jsx global>{`
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 15mm 10mm;
+          }
+          html,
+          body {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          /* Hide everything by default */
+          body > * {
+            display: none !important;
+          }
+          /* Show only the app layout and its main content */
+          body > #__next,
+          body > div {
+            display: block !important;
+          }
+          /* Hide sidebar, header, nav, all chrome */
           .sidebar-container,
+          [data-sidebar],
+          [data-sidebar="sidebar"],
+          aside,
           header,
           nav,
+          footer,
           button,
           .print\\:hidden {
             display: none !important;
           }
-          body {
-            background-color: white !important;
-          }
+          /* Make main take full width, centered */
           main {
             padding: 0 !important;
-            margin: 0 !important;
+            margin: 0 auto !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            background: transparent !important;
+            min-height: 0 !important;
           }
+          /* The outer page wrapper — make invisible container */
+          .w-full.space-y-6 {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            gap: 0 !important;
+            width: 100% !important;
+          }
+          /* The main card container — strip everything */
+          .bg-card.rounded-2xl,
           .animate-in {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
             animation: none !important;
+            transform: none !important;
+            width: 100% !important;
+          }
+          /* The grid — make it block so only left column shows */
+          .grid.grid-cols-1 {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            width: 100% !important;
+            gap: 0 !important;
+          }
+          /* Left column wrapper */
+          .lg\\:col-span-6 {
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+          }
+          /* The official ID Badge Card */
+          .print-badge-card {
+            width: 88mm !important;
+            max-width: 88mm !important;
+            margin: 4mm auto 0 auto !important;
+            padding: 6mm 6mm 5mm 6mm !important;
+            border: 2px solid #0f172a !important;
+            border-radius: 4.5mm !important;
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            page-break-after: avoid !important;
           }
         }
       `}</style>

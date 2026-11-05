@@ -85,29 +85,74 @@ export function ReportsPanel() {
       {/* Print Specific CSS */}
       <style jsx global>{`
         @media print {
+          @page {
+            size: portrait;
+            margin: 12mm;
+          }
           body {
             background: white !important;
-            color: black !important;
+            color: #0f172a !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           header,
           nav,
           aside,
-          .no-print {
+          [data-sidebar="sidebar"],
+          .sidebar,
+          .sidebar-container,
+          .no-print,
+          .print\\:hidden,
+          button {
             display: none !important;
           }
           main {
             padding: 0 !important;
             margin: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
           }
           .print-card {
             box-shadow: none !important;
-            border: 1px solid #e2e8f0 !important;
-            break-inside: avoid;
+            border: 1px solid #cbd5e1 !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .md\\:hidden {
+            display: none !important;
+          }
+          .hidden.md\\:block {
+            display: block !important;
           }
         }
       `}</style>
 
 
+
+      {/* ── PRINT-ONLY OFFICIAL REPORT HEADER ── */}
+      <div className="hidden print:block mb-6 border-b-2 border-slate-900 pb-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-slate-900 tracking-tight text-lg">COG APP</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-slate-900 text-white font-semibold uppercase">Official Audit</span>
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 mt-1 font-headline">
+              Inventory &amp; Asset Management Report
+            </h1>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Church Operations &amp; Governance &bull; Equipment Utilization &amp; Safety Stock Audit
+            </p>
+          </div>
+          <div className="text-right text-xs text-slate-600">
+            <p className="font-bold text-slate-900">
+              Official Inventory Report
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Confidential &bull; Internal Operations Only</p>
+          </div>
+        </div>
+      </div>
 
       {/* ── MAIN CHARTS & LISTS GRID ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

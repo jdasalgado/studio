@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -82,6 +82,7 @@ import {
   Edit,
   Trash2,
   LoaderCircle,
+  RefreshCw,
   HeartHandshake,
   Search,
   BarChart3,
@@ -717,6 +718,15 @@ const DevotionForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  // Camera Capture State
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
+  const [tempCapturedPhoto, setTempCapturedPhoto] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (devotion) {
       setManualType(devotion.manualType || "C2S Devotional Manual");
@@ -815,6 +825,162 @@ const DevotionForm = ({
   const handleRemovePhoto = () => {
     setPhotoUrls([]);
   };
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setTempCapturedPhoto(null);
+    setIsCameraOpen(false);
+    setIsStartingCamera(false);
+  }, []);
+
+  // Detect Capacitor native context (Android/iOS APK)
+  const isCapacitorNative = () =>
+    typeof window !== 'undefined' &&
+    !!(window as any).Capacitor?.isNativePlatform?.();
+
+  const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
+    // ── CAPACITOR NATIVE (Android / iOS APK) ──────────────────────────────
+    // Use the official @capacitor/camera plugin so the OS native camera app opens.
+    if (isCapacitorNative()) {
+      try {
+        const { Camera, CameraResultType, CameraSource, CameraDirection } = await import('@capacitor/camera');
+        const photo = await Camera.getPhoto({
+          quality: 85,
+          allowEditing: false,
+          resultType: CameraResultType.DataUrl,
+          source: CameraSource.Camera,
+          direction: facing === 'user' ? CameraDirection.Front : CameraDirection.Rear,
+          saveToGallery: false,
+        });
+        if (photo.dataUrl) {
+          setPhotoUrls([photo.dataUrl]);
+          toast({
+            title: 'Photo Proof Captured',
+            description: 'Devotion session photo successfully attached.',
+          });
+        }
+      } catch (err: any) {
+        // User cancelled or permission denied – silently ignore
+        console.warn('Capacitor Camera cancelled or failed:', err?.message ?? err);
+      }
+      return; // Done — no WebRTC viewfinder needed on native
+    }
+
+    // ── WEB BROWSER (getUserMedia WebRTC viewfinder) ──────────────────────
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      // Ultimate fallback: open device camera via <input capture>
+      nativeCameraInputRef.current?.click();
+      return;
+    }
+
+    setIsCameraOpen(true);
+    setIsStartingCamera(true);
+    setTempCapturedPhoto(null);
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+
+    try {
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setIsStartingCamera(false);
+    } catch (err: any) {
+      console.warn('Direct camera access failed, falling back to device camera input:', err);
+      setIsStartingCamera(false);
+      nativeCameraInputRef.current?.click();
+      setIsCameraOpen(false);
+    }
+  };
+
+  const handleCaptureSnapshot = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    setTempCapturedPhoto(dataUrl);
+  };
+
+  const handleConfirmCapturedPhoto = () => {
+    if (!tempCapturedPhoto) return;
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1024;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.72);
+        setPhotoUrls([compressed]);
+      } else {
+        setPhotoUrls([tempCapturedPhoto]);
+      }
+      stopCamera();
+      toast({
+        title: "Photo Proof Captured",
+        description: "Devotion session photo successfully attached.",
+      });
+    };
+    img.onerror = () => {
+      setPhotoUrls([tempCapturedPhoto]);
+      stopCamera();
+    };
+    img.src = tempCapturedPhoto;
+  };
+
+  const handleSwitchCamera = () => {
+    const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    setCameraFacing(nextFacing);
+    startCamera(nextFacing);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
 
   const handleSubmit = async () => {
     const finalTopic = selectedLesson || customTopic.trim() || selectedModule || "Devotion Session";
@@ -1140,27 +1306,57 @@ const DevotionForm = ({
           </span>
         </div>
 
+        {/* Hidden Native Device Camera Fallback */}
+        <input
+          ref={nativeCameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
         {photoUrls.length === 0 ? (
-          <label className="cursor-pointer block">
-            <input
-              type="file"
-              accept=".png,.jpg,.jpeg,image/png,image/jpeg,image/webp"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200/90 dark:border-border hover:border-sidebar/60 bg-white dark:bg-background rounded-xl transition-all text-center group">
-              <div className="w-10 h-10 rounded-full bg-sidebar/10 text-sidebar dark:text-sky-400 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Option 1: Live Camera / Take Photo */}
+            <button
+              type="button"
+              onClick={() => startCamera("environment")}
+              className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-sidebar/40 dark:border-sky-500/40 hover:border-sidebar bg-sidebar/5 dark:bg-sidebar/10 hover:bg-sidebar/10 rounded-2xl transition-all text-center group cursor-pointer shadow-2xs"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-sidebar text-white flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform shadow-xs">
+                <Camera className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-bold text-foreground group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
+                Take Photo
+              </p>
+              <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                Use camera to snap live session
+              </p>
+            </button>
+
+            {/* Option 2: Upload File from Device */}
+            <label className="cursor-pointer flex flex-col items-center justify-center p-5 border-2 border-dashed border-slate-200/90 dark:border-border hover:border-sidebar/60 bg-white dark:bg-background rounded-2xl transition-all text-center group shadow-2xs">
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg,image/webp"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-muted text-slate-700 dark:text-slate-200 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform shadow-2xs">
                 <UploadCloud className="h-5 w-5" />
               </div>
-              <p className="text-xs font-bold text-foreground">Click to upload photo proof</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Horizontal / Landscape orientation â€¢ Up to 25MB
+              <p className="text-xs font-bold text-foreground group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
+                Upload from Device
               </p>
-            </div>
-          </label>
+              <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                Choose existing photo (up to 25MB)
+              </p>
+            </label>
+          </div>
         ) : (
-          <div className="space-y-2">
-            <div className="relative aspect-video max-h-52 w-full rounded-xl overflow-hidden border border-border/80 bg-black/5 flex items-center justify-center shadow-xs">
+          <div className="space-y-2.5">
+            <div className="relative aspect-video max-h-56 w-full rounded-2xl overflow-hidden border border-border/80 bg-black/5 flex items-center justify-center shadow-xs">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photoUrls[0]} alt="Proof photo" className="w-full h-full object-contain" />
               <button
@@ -1172,10 +1368,181 @@ const DevotionForm = ({
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
+
+            <div className="flex items-center justify-between gap-2 px-1">
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Photo Proof Attached
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => startCamera("environment")}
+                  className="text-xs font-semibold text-sidebar dark:text-sky-400 hover:underline cursor-pointer inline-flex items-center gap-1"
+                >
+                  <Camera className="h-3 w-3" />
+                  <span>Retake</span>
+                </button>
+                <span className="text-muted-foreground text-xs">&bull;</span>
+                <label className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline cursor-pointer inline-flex items-center gap-1">
+                  <input
+                    type="file"
+                    accept=".png,.jpg,.jpeg,image/png,image/jpeg,image/webp"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <UploadCloud className="h-3 w-3" />
+                  <span>Change File</span>
+                </label>
+              </div>
+            </div>
           </div>
         )}
       </div>
       </div>
+
+      {/* ── LIVE CAMERA VIEWFINDER DIALOG ── */}
+      <Dialog open={isCameraOpen} onOpenChange={(open) => !open && stopCamera()}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] sm:max-w-xl p-0 overflow-hidden rounded-3xl border-border/80 shadow-2xl bg-slate-950 text-white [&>button:last-child]:hidden">
+          {/* Header */}
+          <div className="p-4 sm:p-5 pb-3 border-b border-white/10 flex items-center justify-between gap-3 bg-black/40 backdrop-blur-md">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-sidebar text-white flex items-center justify-center shadow-xs">
+                <Camera className="h-4 w-4" />
+              </div>
+              <div>
+                <DialogTitle className="text-sm sm:text-base font-bold text-white tracking-tight">
+                  Capture Devotion Photo Proof
+                </DialogTitle>
+                <DialogDescription className="text-[11px] text-white/60">
+                  Take a photo of your devotion session or key takeaway notes.
+                </DialogDescription>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={stopCamera}
+              className="h-8 w-8 p-0 rounded-full text-white/70 hover:text-white hover:bg-white/10 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </div>
+
+          {/* Viewfinder Body */}
+          <div className="relative aspect-video max-h-[60vh] bg-black flex items-center justify-center overflow-hidden">
+            {isStartingCamera && !tempCapturedPhoto && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 z-10 text-white">
+                <LoaderCircle className="h-8 w-8 animate-spin text-sidebar" />
+                <span className="text-xs font-semibold">Starting camera...</span>
+              </div>
+            )}
+
+            {/* Live Video Feed */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={cn(
+                "w-full h-full object-cover",
+                tempCapturedPhoto ? "hidden" : "block",
+                cameraFacing === "user" && "scale-x-[-1]"
+              )}
+            />
+
+            {/* Captured Still Preview */}
+            {tempCapturedPhoto && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={tempCapturedPhoto}
+                alt="Captured snapshot"
+                className="w-full h-full object-contain"
+              />
+            )}
+
+            {/* Camera Viewfinder Alignment Overlay */}
+            {!tempCapturedPhoto && !isStartingCamera && (
+              <div className="absolute inset-4 sm:inset-6 border border-white/30 rounded-2xl pointer-events-none flex flex-col justify-between p-3">
+                <div className="flex justify-between">
+                  <div className="w-4 h-4 border-t-2 border-l-2 border-white rounded-tl-sm" />
+                  <div className="w-4 h-4 border-t-2 border-r-2 border-white rounded-tr-sm" />
+                </div>
+                <div className="text-center">
+                  <span className="text-[10px] font-mono font-semibold bg-black/60 text-white/80 px-2.5 py-1 rounded-full backdrop-blur-xs">
+                    Landscape format recommended
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <div className="w-4 h-4 border-b-2 border-l-2 border-white rounded-bl-sm" />
+                  <div className="w-4 h-4 border-b-2 border-r-2 border-white rounded-br-sm" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Viewfinder Footer Controls */}
+          <div className="p-4 sm:p-5 border-t border-white/10 bg-black/40 backdrop-blur-md flex items-center justify-between gap-3">
+            {tempCapturedPhoto ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setTempCapturedPhoto(null)}
+                  className="rounded-xl border-white/20 text-white hover:bg-white/10 text-xs font-semibold h-10 px-4 cursor-pointer"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Retake Photo
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleConfirmCapturedPhoto}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-10 px-5 gap-1.5 shadow-md cursor-pointer"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Use This Photo
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleSwitchCamera}
+                  className="rounded-xl text-white/80 hover:text-white hover:bg-white/10 text-xs font-semibold h-10 px-3.5 gap-1.5 cursor-pointer"
+                  title="Switch Front/Back Camera"
+                >
+                  <ArrowRightLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Flip Camera</span>
+                </Button>
+
+                {/* Shutter Button */}
+                <button
+                  type="button"
+                  onClick={handleCaptureSnapshot}
+                  disabled={isStartingCamera}
+                  className="h-14 w-14 rounded-full border-4 border-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform bg-white/20 cursor-pointer shadow-lg mx-auto disabled:opacity-50"
+                  title="Take photo"
+                >
+                  <div className="h-10 w-10 rounded-full bg-white shadow-xs" />
+                </button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={stopCamera}
+                  className="rounded-xl text-white/70 hover:text-white hover:bg-white/10 text-xs font-semibold h-10 px-4 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* â”€â”€ STICKY FOOTER ACTIONS (ALWAYS FIXED AT BOTTOM) â”€â”€ */}
       <div className="p-3.5 sm:p-4 border-t border-border/70 bg-card/95 backdrop-blur-md shrink-0 flex items-center justify-end gap-2.5 sticky bottom-0 z-10 shadow-xs">
@@ -1255,7 +1622,7 @@ const DevotionDetailsModal = ({
                     <span>{formattedDate}</span>
                     {formattedTime && (
                       <>
-                        <span className="opacity-40">â€¢</span>
+                        <span className="opacity-40">•</span>
                         <span>{formattedTime}</span>
                       </>
                     )}
@@ -1303,11 +1670,11 @@ const DevotionDetailsModal = ({
             {devotion.manualType && <span>{devotion.manualType}</span>}
             {devotion.moduleName && (
               <>
-                <span className="text-muted-foreground/60">â€¢</span>
+                <span className="text-muted-foreground/60">•</span>
                 <span>{devotion.moduleName}</span>
               </>
             )}
-            <span className="text-muted-foreground/60">â€¢</span>
+            <span className="text-muted-foreground/60">•</span>
             <span className="font-bold text-foreground">{devotion.lessonName || devotion.topic}</span>
           </div>
 
@@ -2174,7 +2541,7 @@ const AdminOverview = ({
             .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
           const lastSessionDate = menteeDevos[0]?.devotionDate
             ? format(toJsDate(menteeDevos[0].devotionDate), "MMM dd, yyyy")
-            : "â€”";
+            : "—";
 
           const progressPct =
             m.status === "Completed"
@@ -2266,7 +2633,7 @@ const AdminOverview = ({
         : null;
       const headName = headWorker
         ? `${headWorker.firstName} ${headWorker.lastName}`
-        : "â€”";
+        : "—";
 
       const clusters = (clusterList || []).map((c) => {
         const matchingGroups = groups.filter((g) =>
@@ -2431,7 +2798,7 @@ const AdminOverview = ({
         {departmentStats.map((dept) => {
           const meta = getDepartmentMeta(dept.rawDept || dept.department);
           const DeptIcon = meta.icon;
-          const initials = dept.headName !== "â€”"
+          const initials = dept.headName !== "—"
             ? dept.headName
               .split(" ")
               .map((n: string) => n[0])
@@ -2486,14 +2853,14 @@ const AdminOverview = ({
                 {/* Department Head Box */}
                 <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 dark:bg-muted/20 border border-slate-100 dark:border-border/40">
                   <div className="w-7 h-7 rounded-full bg-sidebar/10 text-sidebar dark:bg-sidebar/30 dark:text-sidebar-foreground font-bold text-[10px] flex items-center justify-center shrink-0">
-                    {dept.headName !== "â€”" ? initials : "?"}
+                    {dept.headName !== "—" ? initials : "?"}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Department Head
                     </p>
                     <p className="text-xs font-semibold text-foreground truncate">
-                      {dept.headName !== "â€”" ? dept.headName : "Unassigned"}
+                      {dept.headName !== "—" ? dept.headName : "Unassigned"}
                     </p>
                   </div>
                 </div>
@@ -2619,7 +2986,7 @@ const AdminOverview = ({
                       {dev.lessonName || dev.topic}
                     </h4>
                     <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
-                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "Mentor"}</span> â€¢ Mentees: {dev.attendeeNames?.join(", ") || "Mentee"}
+                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "Mentor"}</span> • Mentees: {dev.attendeeNames?.join(", ") || "Mentee"}
                     </p>
                   </div>
                 </div>
@@ -2810,7 +3177,7 @@ const AdminOverview = ({
                               {cluster.name}
                             </h5>
                             <p className="text-[11px] text-muted-foreground">
-                              {cluster.groupsCount} groups â€¢ {cluster.mentorsCount} mentors
+                              {cluster.groupsCount} groups • {cluster.mentorsCount} mentors
                             </p>
                           </div>
                         </div>
@@ -2881,7 +3248,7 @@ const AdminOverview = ({
                               </Badge>
                             </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {mentor.email || mentor.phone || "Mentor"} {mentor.groupsCount > 0 ? `â€¢ ${mentor.groupsCount} active group(s)` : ""}
+                              {mentor.email || mentor.phone || "Mentor"} {mentor.groupsCount > 0 ? `• ${mentor.groupsCount} active group(s)` : ""}
                             </p>
                           </div>
                         </div>
@@ -2923,7 +3290,7 @@ const AdminOverview = ({
                                     </div>
                                     <div className="min-w-0">
                                       <p className="font-semibold text-foreground text-xs truncate">{me.fullName}</p>
-                                      <p className="text-[10px] text-muted-foreground truncate">{me.ministryName} {me.email ? `â€¢ ${me.email}` : ""}</p>
+                                      <p className="text-[10px] text-muted-foreground truncate">{me.ministryName} {me.email ? `• ${me.email}` : ""}</p>
                                     </div>
                                   </div>
                                   <Badge variant="secondary" className={cn(statusColorClass, "px-2 py-0.5 rounded-full text-[10px] font-bold border-transparent shrink-0")}>
@@ -2988,7 +3355,7 @@ const AdminOverview = ({
                           <div className="min-w-0">
                             <p className="font-bold text-sm text-foreground truncate">{m.fullName}</p>
                             <p className="text-[11px] text-muted-foreground truncate">
-                              {m.ministryName} â€¢ {m.mentorName ? `Mentor: ${m.mentorName}` : "No mentor"}
+                              {m.ministryName} • {m.mentorName ? `Mentor: ${m.mentorName}` : "No mentor"}
                             </p>
                           </div>
                         </div>
@@ -3289,12 +3656,12 @@ const C2SAnalytics = ({
 
       const devotionsRows = filteredDevotions.map((d) => [
         d.devotionDate ? format(toJsDate(d.devotionDate), "yyyy-MM-dd") : "",
-        d.lessonName || d.topic || "â€”",
-        d.clusterName || "â€”",
-        d.mentorName || "â€”",
+        d.lessonName || d.topic || "—",
+        d.clusterName || "—",
+        d.mentorName || "—",
         d.attendeeCount || (d.attendeeNames || []).length || 0,
-        (d.attendeeNames || []).join(", ") || "â€”",
-        d.prayerRequests || "â€”",
+        (d.attendeeNames || []).join(", ") || "—",
+        d.prayerRequests || "—",
       ]);
 
       const devotionsSheet = XLSX.utils.aoa_to_sheet([
@@ -3325,11 +3692,11 @@ const C2SAnalytics = ({
       ];
 
       const menteeRows = filteredMentees.map((m) => [
-        m.fullName || `${m.firstName || ""} ${m.lastName || ""}`.trim() || "â€”",
+        m.fullName || `${m.firstName || ""} ${m.lastName || ""}`.trim() || "—",
         m.status || "In Progress",
-        m.groupName || m.clusterName || "â€”",
-        m.mentorName || "â€”",
-        m.contactNumber || "â€”",
+        m.groupName || m.clusterName || "—",
+        m.mentorName || "—",
+        m.contactNumber || "—",
       ]);
 
       const menteesSheet = XLSX.utils.aoa_to_sheet([
@@ -3637,7 +4004,7 @@ const C2SAnalytics = ({
                       {dev.lessonName || dev.topic}
                     </h4>
                     <p className="text-xs text-muted-foreground line-clamp-1">
-                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "â€”"}</span> â€¢ Mentees: {dev.attendeeNames?.join(", ") || "â€”"}
+                      Mentor: <span className="font-medium text-foreground">{dev.mentorName || "—"}</span> • Mentees: {dev.attendeeNames?.join(", ") || "—"}
                     </p>
                   </div>
                 </div>
@@ -3675,7 +4042,7 @@ const C2SAnalytics = ({
   );
 };
 
-// departmentClusters is now derived from DB â€” see departmentClusters useMemo in C2SPage
+// departmentClusters is now derived from DB — see departmentClusters useMemo in C2SPage
 
 // â”€â”€â”€ MAIN CONNECT 2 SOULS PAGE COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function C2SPageContent() {
@@ -5567,7 +5934,7 @@ function C2SPageContent() {
                             .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
                           const lastSessionDate = menteeDevotions[0]?.devotionDate
                             ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd")
-                            : "â€”";
+                            : "—";
                           const progressPct =
                             m.status === "Completed" ? 100 :
                               menteeDevotions.length > 0 ? Math.min(100, Math.round((menteeDevotions.length / 24) * 100)) : 0;
@@ -5733,7 +6100,7 @@ function C2SPageContent() {
                                 .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
                               const lastSessionDate = menteeDevotions[0]?.devotionDate
                                 ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd")
-                                : "â€”";
+                                : "—";
 
                               const progressPct =
                                 m.status === "Completed"
@@ -6041,7 +6408,7 @@ function C2SPageContent() {
                             .filter((d: any) => d.attendeeNames?.some((name: string) => name.toLowerCase().includes(fullName.toLowerCase())))
                             .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
                           const progressPct = m.status === "Completed" ? 100 : menteeDevotions.length > 0 ? Math.min(100, Math.round((menteeDevotions.length / 24) * 100)) : 0;
-                          const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "â€”";
+                          const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "—";
                           const isMenteeActive = (m.status || "Active").toLowerCase() === "active";
                           const displayStatus = isMenteeActive ? "Active" : "Inactive";
                           const statusColorClass = isMenteeActive
@@ -6220,7 +6587,7 @@ function C2SPageContent() {
                               const menteeDevotions = (allDevotions || [])
                                 .filter((d: any) => d.attendeeNames?.some((name: string) => name.toLowerCase().includes(fullName.toLowerCase())))
                                 .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
-                              const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "â€”";
+                              const lastSessionDate = menteeDevotions[0]?.devotionDate ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd") : "—";
                               const progressPct = m.status === "Completed" ? 100 : menteeDevotions.length > 0 ? Math.min(100, Math.round((menteeDevotions.length / 24) * 100)) : 0;
                               const isMenteeActive = (m.status || "Active").toLowerCase() === "active";
                               const displayStatus = isMenteeActive ? "Active" : "Inactive";
@@ -6409,7 +6776,7 @@ function C2SPageContent() {
                 ? `${workerProfile.firstName?.[0] || ""}${workerProfile.lastName?.[0] || ""}`.toUpperCase()
                 : "UA";
             const menteeMinistry = md.menteeMinistry || getMenteeMinistry(md);
-            const menteeDepartment = getMenteeDepartment ? getMenteeDepartment(md) : "â€”";
+            const menteeDepartment = getMenteeDepartment ? getMenteeDepartment(md) : "—";
             const menteeDevotions = (allDevotions || [])
               .filter((d: any) => d.attendeeNames?.some((name: string) => name.toLowerCase().includes(md.fullName?.toLowerCase())))
               .sort((a: any, b: any) => new Date(b.devotionDate).getTime() - new Date(a.devotionDate).getTime());
@@ -6424,7 +6791,7 @@ function C2SPageContent() {
               ? md.lastSessionDate
               : menteeDevotions[0]?.devotionDate
                 ? format(toJsDate(menteeDevotions[0].devotionDate), "yyyy-MM-dd")
-                : "â€”";
+                : "—";
             const isMenteeActive = (md.status || "Active").toLowerCase() === "active";
             const displayStatus = isMenteeActive ? "Active" : "Inactive";
             const statusColorClass = isMenteeActive ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-slate-500/15 text-slate-700 dark:text-slate-300";
@@ -6475,7 +6842,7 @@ function C2SPageContent() {
                   ].map(({ label, value }) => (
                     <div key={label} className="p-3.5 rounded-xl border border-border/60 bg-card/60">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{label}</p>
-                      <p className="text-sm font-semibold text-foreground">{value || "â€”"}</p>
+                      <p className="text-sm font-semibold text-foreground">{value || "—"}</p>
                     </div>
                   ))}
 
