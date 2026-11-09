@@ -86,22 +86,22 @@ export default function MyReservationsPage() {
 
   const { data: rooms } = useQuery({
     queryKey: ["rooms"],
-    queryFn: getRooms,
+    queryFn: () => getRooms(),
   });
 
   const { data: areas } = useQuery({
     queryKey: ["areas"],
-    queryFn: getAreas,
+    queryFn: () => getAreas(),
   });
 
   const { data: venueElements } = useQuery({
     queryKey: ["venue-elements"],
-    queryFn: getVenueElements,
+    queryFn: () => getVenueElements(),
   });
 
   const { data: ministries } = useQuery({
     queryKey: ["ministries"],
-    queryFn: getMinistries,
+    queryFn: () => getMinistries(),
   });
 
   const isLoading = (roleLoading || bookingsLoading) && !allBookings;

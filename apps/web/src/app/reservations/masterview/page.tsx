@@ -66,12 +66,12 @@ export default function MasterviewPage() {
   // Fetch live data directly from Database actions via React Query
   const { data: rooms, isLoading: roomsLoading } = useQuery({
     queryKey: ["rooms"],
-    queryFn: getRooms,
+    queryFn: () => getRooms(),
   });
 
   const { data: areas, isLoading: areasLoading } = useQuery({
     queryKey: ["areas"],
-    queryFn: getAreas,
+    queryFn: () => getAreas(),
   });
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery({
@@ -91,13 +91,13 @@ export default function MasterviewPage() {
 
   const { data: venueElements, isLoading: venueElementsLoading } = useQuery({
     queryKey: ["venue-elements"],
-    queryFn: getVenueElements,
+    queryFn: () => getVenueElements(),
     staleTime: 5 * 60_000,
   });
 
   const { data: ministries, isLoading: ministriesLoading } = useQuery({
     queryKey: ["ministries"],
-    queryFn: getMinistries,
+    queryFn: () => getMinistries(),
   });
 
   const isLoading =

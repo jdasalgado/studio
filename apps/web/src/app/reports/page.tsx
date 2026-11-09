@@ -1519,7 +1519,7 @@ function ReservationsTab() {
   const monthStart = useMemo(() => startOfMonth(new Date()), []);
   const monthEnd = useMemo(() => endOfMonth(new Date()), []);
   const { data: workers } = useQuery({ queryKey: ["workers", actorId], queryFn: () => getWorkers({ actorId }) });
-  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms });
+  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: () => getRooms() });
   const { data: ministries } = useQuery({ queryKey: ["ministries", actorId], queryFn: () => getMinistries(actorId) });
   const { data: reservations, isLoading } = useQuery({
     queryKey: ["bookings-report", actorId],

@@ -44,17 +44,17 @@ function RoomDisplayContent() {
   const roomId = searchParams.get("roomId");
   const { data: rooms, isLoading: roomLoading } = useQuery({
     queryKey: ["rooms"],
-    queryFn: getRooms,
+    queryFn: () => getRooms(),
   });
   const room = rooms?.find((r) => r.id === roomId);
 
   const { data: areas, isLoading: areasLoading } = useQuery({
     queryKey: ["areas"],
-    queryFn: getAreas,
+    queryFn: () => getAreas(),
   });
   const { data: branches, isLoading: branchesLoading } = useQuery({
     queryKey: ["branches"],
-    queryFn: getBranches,
+    queryFn: () => getBranches(),
   });
   const { data: allBookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ["bookings", { roomId, status: "Approved" }],

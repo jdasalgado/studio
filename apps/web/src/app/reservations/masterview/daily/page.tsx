@@ -136,12 +136,12 @@ export default function ScheduleCalendarPage() {
   // Fetch data live from Database queries
   const { data: rooms, isLoading: roomsLoading } = useQuery({
     queryKey: ["rooms"],
-    queryFn: getRooms,
+    queryFn: () => getRooms(),
   });
 
   const { data: areas, isLoading: areasLoading } = useQuery({
     queryKey: ["areas"],
-    queryFn: getAreas,
+    queryFn: () => getAreas(),
   });
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery({
@@ -160,12 +160,12 @@ export default function ScheduleCalendarPage() {
 
   const { data: venueElements, isLoading: venueElementsLoading } = useQuery({
     queryKey: ["venue-elements"],
-    queryFn: getVenueElements,
+    queryFn: () => getVenueElements(),
   });
 
   const { data: ministries, isLoading: ministriesLoading } = useQuery({
     queryKey: ["ministries"],
-    queryFn: getMinistries,
+    queryFn: () => getMinistries(),
   });
 
   const isLoading =

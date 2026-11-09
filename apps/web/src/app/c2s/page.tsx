@@ -98,8 +98,6 @@ import {
   MapPin,
   Image as ImageIcon,
   ImagePlus,
-  Images,
-  Folder,
   CheckCircle2,
   Sparkles,
   Heart,
@@ -721,38 +719,10 @@ const DevotionForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Camera Capture State
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
-  const [isMobileDevice, setIsMobileDevice] = useState(false);
-  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
-  const [isStartingCamera, setIsStartingCamera] = useState(false);
-  const [tempCapturedPhoto, setTempCapturedPhoto] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const nativeCameraInputRef = useRef<HTMLInputElement>(null);
-  const photoLibraryInputRef = useRef<HTMLInputElement>(null);
-  const chooseFilesInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      if (typeof window === "undefined") return;
-      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const isCoarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-      const isNarrow = window.innerWidth < 768;
-      setIsMobileDevice(isMobileUA || (isCoarse && isNarrow));
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoTrigger = () => {
-    if (isMobileDevice) {
-      setIsPhotoMenuOpen((prev) => !prev);
-    } else {
-      chooseFilesInputRef.current?.click();
-    }
+    fileInputRef.current?.click();
   };
 
   useEffect(() => {
@@ -852,163 +822,10 @@ const DevotionForm = ({
 
   const handleRemovePhoto = () => {
     setPhotoUrls([]);
-  };
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setTempCapturedPhoto(null);
-    setIsCameraOpen(false);
-    setIsStartingCamera(false);
-  }, []);
-
-  // Detect Capacitor native context (Android/iOS APK)
-  const isCapacitorNative = () =>
-    typeof window !== 'undefined' &&
-    !!(window as any).Capacitor?.isNativePlatform?.();
-
-  const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
-    // ── CAPACITOR NATIVE (Android / iOS APK) ──────────────────────────────
-    // Use the official @capacitor/camera plugin so the OS native camera app opens.
-    if (isCapacitorNative()) {
-      try {
-        const { Camera, CameraResultType, CameraSource, CameraDirection } = await import('@capacitor/camera');
-        const photo = await Camera.getPhoto({
-          quality: 85,
-          allowEditing: false,
-          resultType: CameraResultType.DataUrl,
-          source: CameraSource.Camera,
-          direction: facing === 'user' ? CameraDirection.Front : CameraDirection.Rear,
-          saveToGallery: false,
-        });
-        if (photo.dataUrl) {
-          setPhotoUrls([photo.dataUrl]);
-          toast({
-            title: 'Photo Proof Captured',
-            description: 'Devotion session photo successfully attached.',
-          });
-        }
-      } catch (err: any) {
-        // User cancelled or permission denied – silently ignore
-        console.warn('Capacitor Camera cancelled or failed:', err?.message ?? err);
-      }
-      return; // Done — no WebRTC viewfinder needed on native
-    }
-
-    // ── WEB BROWSER (getUserMedia WebRTC viewfinder) ──────────────────────
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      // Ultimate fallback: open device camera via <input capture>
-      nativeCameraInputRef.current?.click();
-      return;
-    }
-
-    setIsCameraOpen(true);
-    setIsStartingCamera(true);
-    setTempCapturedPhoto(null);
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: facing },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setIsStartingCamera(false);
-    } catch (err: any) {
-      console.warn('Direct camera access failed, falling back to device camera input:', err);
-      setIsStartingCamera(false);
-      nativeCameraInputRef.current?.click();
-      setIsCameraOpen(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
-
-  const handleCaptureSnapshot = () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-    setTempCapturedPhoto(dataUrl);
-  };
-
-  const handleConfirmCapturedPhoto = () => {
-    if (!tempCapturedPhoto) return;
-    const img = new Image();
-    img.onload = () => {
-      const maxDim = 1024;
-      let width = img.width;
-      let height = img.height;
-      if (width > maxDim || height > maxDim) {
-        if (width > height) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL("image/jpeg", 0.72);
-        setPhotoUrls([compressed]);
-      } else {
-        setPhotoUrls([tempCapturedPhoto]);
-      }
-      stopCamera();
-      toast({
-        title: "Photo Proof Captured",
-        description: "Devotion session photo successfully attached.",
-      });
-    };
-    img.onerror = () => {
-      setPhotoUrls([tempCapturedPhoto]);
-      stopCamera();
-    };
-    img.src = tempCapturedPhoto;
-  };
-
-  const handleSwitchCamera = () => {
-    const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
-    setCameraFacing(nextFacing);
-    startCamera(nextFacing);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
 
   const handleSubmit = async () => {
     const finalTopic = selectedLesson || customTopic.trim() || selectedModule || "Devotion Session";
@@ -1317,35 +1134,17 @@ const DevotionForm = ({
           PHOTO <span className="text-red-500 font-bold">*</span>
         </label>
 
-        {/* Hidden File Inputs */}
-        {/* 1. Photo Library (Gallery) */}
+        {/* Hidden File Input */}
         <input
-          ref={photoLibraryInputRef}
+          ref={fileInputRef}
           type="file"
           accept="image/*"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-        {/* 2. Choose Files (All formats) */}
-        <input
-          ref={chooseFilesInputRef}
-          type="file"
-          accept="image/*,.heic,.png,.jpg,.jpeg,.webp"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-        {/* 3. Native Camera Fallback */}
-        <input
-          ref={nativeCameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
           onChange={handleFileUpload}
           className="hidden"
         />
 
         {photoUrls.length === 0 ? (
-          <div className="relative inline-block">
+          <div>
             <button
               type="button"
               onClick={handlePhotoTrigger}
@@ -1358,60 +1157,6 @@ const DevotionForm = ({
                 Add photo
               </span>
             </button>
-
-            {/* ── MOBILE ONLY ACTION MENU (Pops up directly over/at the Add photo button) ── */}
-            {isPhotoMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40 bg-transparent"
-                  onClick={() => setIsPhotoMenuOpen(false)}
-                />
-                <div
-                  style={{ backgroundColor: "#323234" }}
-                  className="absolute top-0 left-0 z-50 w-44 sm:w-48 overflow-hidden rounded-2xl bg-[#323234] text-white border border-white/20 shadow-xl p-1 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPhotoMenuOpen(false);
-                      chooseFilesInputRef.current?.click();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-                  >
-                    <Folder className="h-4 w-4 text-white shrink-0" />
-                    <span className="text-xs font-semibold text-white tracking-normal">Choose Files</span>
-                  </button>
-
-                  <div className="h-px w-full bg-white/20 my-0.5" />
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPhotoMenuOpen(false);
-                      startCamera("environment");
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-                  >
-                    <Camera className="h-4 w-4 text-white shrink-0" />
-                    <span className="text-xs font-semibold text-white tracking-normal">Take Photo</span>
-                  </button>
-
-                  <div className="h-px w-full bg-white/20 my-0.5" />
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPhotoMenuOpen(false);
-                      photoLibraryInputRef.current?.click();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-                  >
-                    <Images className="h-4 w-4 text-white shrink-0" />
-                    <span className="text-xs font-semibold text-white tracking-normal">Photo Library</span>
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         ) : (
           <div className="flex items-start gap-3">
@@ -1437,7 +1182,7 @@ const DevotionForm = ({
                 <CheckCircle2 className="h-3.5 w-3.5" /> Photo Proof Attached
               </span>
 
-              <div className="relative inline-block">
+              <div>
                 <button
                   type="button"
                   onClick={handlePhotoTrigger}
@@ -1446,209 +1191,12 @@ const DevotionForm = ({
                   <RefreshCw className="h-3 w-3" />
                   <span>Change photo</span>
                 </button>
-
-                {isPhotoMenuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40 bg-transparent"
-                      onClick={() => setIsPhotoMenuOpen(false)}
-                    />
-                    <div
-                      style={{ backgroundColor: "#323234" }}
-                      className="absolute top-0 left-0 z-50 w-44 sm:w-48 overflow-hidden rounded-2xl bg-[#323234] text-white border border-white/20 shadow-xl p-1 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPhotoMenuOpen(false);
-                          chooseFilesInputRef.current?.click();
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-                      >
-                        <Folder className="h-4 w-4 text-white shrink-0" />
-                        <span className="text-xs font-semibold text-white tracking-normal">Choose Files</span>
-                      </button>
-
-                      <div className="h-px w-full bg-white/20 my-0.5" />
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPhotoMenuOpen(false);
-                          startCamera("environment");
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-                      >
-                        <Camera className="h-4 w-4 text-white shrink-0" />
-                        <span className="text-xs font-semibold text-white tracking-normal">Take Photo</span>
-                      </button>
-
-                      <div className="h-px w-full bg-white/20 my-0.5" />
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPhotoMenuOpen(false);
-                          photoLibraryInputRef.current?.click();
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-                      >
-                        <Images className="h-4 w-4 text-white shrink-0" />
-                        <span className="text-xs font-semibold text-white tracking-normal">Photo Library</span>
-                      </button>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           </div>
         )}
       </div>
     </div>
-
-      {/* ── LIVE CAMERA VIEWFINDER DIALOG ── */}
-      <Dialog open={isCameraOpen} onOpenChange={(open) => !open && stopCamera()}>
-        <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] sm:max-w-xl p-0 overflow-hidden rounded-3xl border-border/80 shadow-2xl bg-slate-950 text-white [&>button:last-child]:hidden">
-          {/* Header */}
-          <div className="p-4 sm:p-5 pb-3 border-b border-white/10 flex items-center justify-between gap-3 bg-black/40 backdrop-blur-md">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-sidebar text-white flex items-center justify-center shadow-xs">
-                <Camera className="h-4 w-4" />
-              </div>
-              <div>
-                <DialogTitle className="text-sm sm:text-base font-bold text-white tracking-tight">
-                  Capture Devotion Photo Proof
-                </DialogTitle>
-                <DialogDescription className="text-[11px] text-white/60">
-                  Take a photo of your devotion session or key takeaway notes.
-                </DialogDescription>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={stopCamera}
-              className="h-8 w-8 p-0 rounded-full text-white/70 hover:text-white hover:bg-white/10 cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </div>
-
-          {/* Viewfinder Body */}
-          <div className="relative aspect-video max-h-[60vh] bg-black flex items-center justify-center overflow-hidden">
-            {isStartingCamera && !tempCapturedPhoto && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 z-10 text-white">
-                <LoaderCircle className="h-8 w-8 animate-spin text-sidebar" />
-                <span className="text-xs font-semibold">Starting camera...</span>
-              </div>
-            )}
-
-            {/* Live Video Feed */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={cn(
-                "w-full h-full object-cover",
-                tempCapturedPhoto ? "hidden" : "block",
-                cameraFacing === "user" && "scale-x-[-1]"
-              )}
-            />
-
-            {/* Captured Still Preview */}
-            {tempCapturedPhoto && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={tempCapturedPhoto}
-                alt="Captured snapshot"
-                className="w-full h-full object-contain"
-              />
-            )}
-
-            {/* Camera Viewfinder Alignment Overlay */}
-            {!tempCapturedPhoto && !isStartingCamera && (
-              <div className="absolute inset-4 sm:inset-6 border border-white/30 rounded-2xl pointer-events-none flex flex-col justify-between p-3">
-                <div className="flex justify-between">
-                  <div className="w-4 h-4 border-t-2 border-l-2 border-white rounded-tl-sm" />
-                  <div className="w-4 h-4 border-t-2 border-r-2 border-white rounded-tr-sm" />
-                </div>
-                <div className="text-center">
-                  <span className="text-[10px] font-mono font-semibold bg-black/60 text-white/80 px-2.5 py-1 rounded-full backdrop-blur-xs">
-                    Landscape format recommended
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <div className="w-4 h-4 border-b-2 border-l-2 border-white rounded-bl-sm" />
-                  <div className="w-4 h-4 border-b-2 border-r-2 border-white rounded-br-sm" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Viewfinder Footer Controls */}
-          <div className="p-4 sm:p-5 border-t border-white/10 bg-black/40 backdrop-blur-md flex items-center justify-between gap-3">
-            {tempCapturedPhoto ? (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setTempCapturedPhoto(null)}
-                  className="rounded-xl border-white/20 text-white hover:bg-white/10 text-xs font-semibold h-10 px-4 cursor-pointer"
-                >
-                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                  Retake Photo
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={handleConfirmCapturedPhoto}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-10 px-5 gap-1.5 shadow-md cursor-pointer"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Use This Photo
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleSwitchCamera}
-                  className="rounded-xl text-white/80 hover:text-white hover:bg-white/10 text-xs font-semibold h-10 px-3.5 gap-1.5 cursor-pointer"
-                  title="Switch Front/Back Camera"
-                >
-                  <ArrowRightLeft className="h-4 w-4" />
-                  <span className="hidden sm:inline">Flip Camera</span>
-                </Button>
-
-                {/* Shutter Button */}
-                <button
-                  type="button"
-                  onClick={handleCaptureSnapshot}
-                  disabled={isStartingCamera}
-                  className="h-14 w-14 rounded-full border-4 border-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform bg-white/20 cursor-pointer shadow-lg mx-auto disabled:opacity-50"
-                  title="Take photo"
-                >
-                  <div className="h-10 w-10 rounded-full bg-white shadow-xs" />
-                </button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={stopCamera}
-                  className="rounded-xl text-white/70 hover:text-white hover:bg-white/10 text-xs font-semibold h-10 px-4 cursor-pointer"
-                >
-                  Cancel
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* â”€â”€ STICKY FOOTER ACTIONS (ALWAYS FIXED AT BOTTOM) â”€â”€ */}
       <div className="p-3.5 sm:p-4 border-t border-border/70 bg-card/95 backdrop-blur-md shrink-0 flex items-center justify-end gap-2.5 sticky bottom-0 z-10 shadow-xs">
@@ -4232,7 +3780,7 @@ function C2SPageContent() {
 
   const { data: rawMinistries } = useQuery({
     queryKey: ["ministries"],
-    queryFn: getMinistries,
+    queryFn: () => getMinistries(),
   });
   const allMinistries = useMemo<any[]>(() => {
     if (Array.isArray(rawMinistries)) return rawMinistries;
@@ -4242,7 +3790,7 @@ function C2SPageContent() {
 
   const { data: rawDepartmentSettings } = useQuery({
     queryKey: ["department-settings"],
-    queryFn: getDepartmentSettings,
+    queryFn: () => getDepartmentSettings(),
   });
   const departmentSettings = useMemo<any[]>(() => {
     if (Array.isArray(rawDepartmentSettings)) return rawDepartmentSettings;

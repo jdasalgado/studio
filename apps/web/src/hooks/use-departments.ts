@@ -6,7 +6,7 @@ export function useDepartments() {
 
     const { data, isLoading, error } = useQuery({
         queryKey: ['departments'],
-        queryFn: getDepartmentSettings,
+        queryFn: () => getDepartmentSettings(),
         staleTime: 5 * 60_000,
     });
 

@@ -88,19 +88,19 @@ export default function VenueAssistanceSettingsPage() {
     // ── Data fetching ────────────────────────────────────────────────────────
     const { data: allRooms = [], isLoading: isRoomsLoading } = useQuery({
         queryKey: ["rooms"],
-        queryFn: getRooms,
+        queryFn: () => getRooms(),
         enabled: canAccess,
     });
 
     const { data: allMinistries = [], isLoading: isMinistriesLoading } = useQuery({
         queryKey: ["ministries"],
-        queryFn: getMinistries,
+        queryFn: () => getMinistries(),
         enabled: canAccess,
     });
 
     const { data: configs = [], isLoading: isConfigsLoading } = useQuery({
         queryKey: ["assistanceConfigs"],
-        queryFn: getAllAssistanceConfigs,
+        queryFn: () => getAllAssistanceConfigs(),
         enabled: canAccess,
     });
 

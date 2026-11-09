@@ -125,7 +125,7 @@ export function BookingForm({ workerProfileId, onSubmit, isSubmitting = false }:
     const [recurrenceEndMode, setRecurrenceEndMode] = useState<"date" | "count">("date");
 
     // ── Data fetching ─────────────────────────────────────────────────────────
-    const { data: allRooms = [] } = useQuery({ queryKey: ["rooms"], queryFn: getRooms });
+    const { data: allRooms = [] } = useQuery({ queryKey: ["rooms"], queryFn: () => getRooms() });
     const { data: allMinistries = [] } = useQuery<any[]>({ queryKey: ["ministries"], queryFn: () => getMinistries() });
     const { data: roomConfigs = [] } = useQuery({
         queryKey: ["assistanceConfigs", "room", roomId],

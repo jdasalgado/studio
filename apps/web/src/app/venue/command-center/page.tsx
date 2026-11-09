@@ -357,7 +357,7 @@ export default function CommandCenterPage() {
     // Fetch ministries for filter dropdown
     const { data: ministries = [] } = useQuery({
         queryKey: ["ministries"],
-        queryFn: getMinistries,
+        queryFn: () => getMinistries(),
         enabled: canManageVenueAssistance,
     });
 

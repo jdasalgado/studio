@@ -82,11 +82,11 @@ export default function SettingsPage() {
   const { toast } = useToast();
 
   // Live counts from DB
-  const { data: roles } = useQuery({ queryKey: ["roles"], queryFn: getRoles });
+  const { data: roles } = useQuery({ queryKey: ["roles"], queryFn: () => getRoles() });
   const { data: workers } = useQuery({ queryKey: ["workers-all"], queryFn: () => getWorkers() });
-  const { data: ministries } = useQuery({ queryKey: ["ministries"], queryFn: getMinistries });
-  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms });
-  const { data: deptSettings } = useQuery({ queryKey: ["department-settings"], queryFn: getDepartmentSettings });
+  const { data: ministries } = useQuery({ queryKey: ["ministries"], queryFn: () => getMinistries() });
+  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: () => getRooms() });
+  const { data: deptSettings } = useQuery({ queryKey: ["department-settings"], queryFn: () => getDepartmentSettings() });
 
   const roleCount = roles?.length ?? 0;
   const systemRoles = (roles as any[] || []).filter(r => r.isSystemRole).length;

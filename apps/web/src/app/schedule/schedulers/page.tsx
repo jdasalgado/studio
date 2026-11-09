@@ -28,7 +28,7 @@ export default function SchedulersPage() {
 
     const { data: schedulerData, isLoading: schedulersLoading } = useQuery({
         queryKey: ['ministry-schedulers'],
-        queryFn: getMinistrySchedulers,
+        queryFn: () => getMinistrySchedulers(),
     });
 
     const assignMutation = useMutation({

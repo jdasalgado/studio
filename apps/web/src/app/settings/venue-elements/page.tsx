@@ -183,12 +183,12 @@ export default function VenueElementsManagementPage() {
 
     const { data: elements, isLoading: elementsLoading } = useQuery({
         queryKey: ["venue-elements"],
-        queryFn: getVenueElements,
+        queryFn: () => getVenueElements(),
     });
 
     const { data: ministriesData, isLoading: ministriesLoading } = useQuery({
         queryKey: ["ministries"],
-        queryFn: getMinistries,
+        queryFn: () => getMinistries(),
     });
     const ministries = (ministriesData || []) as Ministry[];
 

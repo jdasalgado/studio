@@ -2131,12 +2131,12 @@ export default function OrsLegacySyncPage() {
     isLoading: statsLoading,
   } = useQuery({
     queryKey: ["ors-sync-stats"],
-    queryFn: getOrsSyncStats,
+    queryFn: () => getOrsSyncStats(),
   });
 
   const { data: ministryMap } = useQuery({
     queryKey: ["ors-ministry-map"],
-    queryFn: getOrsMinistryMap,
+    queryFn: () => getOrsMinistryMap(),
   });
 
   const handleResult = useCallback(
