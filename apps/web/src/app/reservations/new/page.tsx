@@ -29,9 +29,6 @@ import {
   RotateCcw,
   Wrench,
   AlertTriangle,
-  Tv,
-  Mic,
-  Speaker,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -88,9 +85,6 @@ export default function NewReservationPage() {
   const [numChairs, setNumChairs] = useState("");
   const [requestedElements, setRequestedElements] = useState<string[]>([]);
   const [customAvRequest, setCustomAvRequest] = useState("");
-  const [equipmentTv, setEquipmentTv] = useState(false);
-  const [equipmentMic, setEquipmentMic] = useState(false);
-  const [equipmentSpeakers, setEquipmentSpeakers] = useState(false);
   const [guidelinesAccepted, setGuidelinesAccepted] = useState(false);
 
   // Initialize Request ID and User defaults
@@ -619,9 +613,9 @@ export default function NewReservationPage() {
           ...requestedElements,
           ...(customAvRequest.trim() ? [customAvRequest.trim()] : []),
         ],
-        equipment_TV: equipmentTv,
-        equipment_Mic: equipmentMic,
-        equipment_Speakers: equipmentSpeakers,
+        equipment_TV: false,
+        equipment_Mic: false,
+        equipment_Speakers: false,
         guidelinesAccepted: true,
       };
 
@@ -685,9 +679,6 @@ export default function NewReservationPage() {
             setStartTime("");
             setEndTime("");
             setCustomAvRequest("");
-            setEquipmentTv(false);
-            setEquipmentMic(false);
-            setEquipmentSpeakers(false);
             setRequestedElements([]);
             setGeneratedRequestId(`REQ-${Math.floor(1000 + Math.random() * 9000)}`);
           },
@@ -1281,84 +1272,13 @@ export default function NewReservationPage() {
             </div>
 
             {/* ── REQUESTED ELEMENTS & AV (OPTIONAL) ── */}
-            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-border/60">
-              <div className="space-y-0.5">
-                <label className="text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
-                  Requested Elements &amp; AV <span className="text-[10px] font-normal text-muted-foreground lowercase">(optional)</span>
-                </label>
-                <p className="text-[11px] text-muted-foreground">
-                  Select common AV equipment or type specific equipment/setup requests for your reservation.
-                </p>
-              </div>
-
-              {/* Common AV Equipment Checkboxes */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div
-                  onClick={() => setEquipmentTv(!equipmentTv)}
-                  className={cn(
-                    "flex items-center space-x-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none",
-                    equipmentTv
-                      ? "bg-primary/5 border-primary/40 text-foreground dark:bg-primary/10 shadow-2xs"
-                      : "bg-slate-50/70 dark:bg-muted/20 border-slate-200/70 dark:border-border/60 text-muted-foreground hover:border-slate-300 dark:hover:border-border"
-                  )}
-                >
-                  <Checkbox
-                    id="equipment-tv"
-                    checked={equipmentTv}
-                    onCheckedChange={(c) => setEquipmentTv(!!c)}
-                  />
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Tv className="h-4 w-4 text-blue-500 shrink-0" />
-                    <span className="text-xs font-semibold">Television / Presentation</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setEquipmentMic(!equipmentMic)}
-                  className={cn(
-                    "flex items-center space-x-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none",
-                    equipmentMic
-                      ? "bg-primary/5 border-primary/40 text-foreground dark:bg-primary/10 shadow-2xs"
-                      : "bg-slate-50/70 dark:bg-muted/20 border-slate-200/70 dark:border-border/60 text-muted-foreground hover:border-slate-300 dark:hover:border-border"
-                  )}
-                >
-                  <Checkbox
-                    id="equipment-mic"
-                    checked={equipmentMic}
-                    onCheckedChange={(c) => setEquipmentMic(!!c)}
-                  />
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Mic className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span className="text-xs font-semibold">Microphone &amp; Audio</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setEquipmentSpeakers(!equipmentSpeakers)}
-                  className={cn(
-                    "flex items-center space-x-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none",
-                    equipmentSpeakers
-                      ? "bg-primary/5 border-primary/40 text-foreground dark:bg-primary/10 shadow-2xs"
-                      : "bg-slate-50/70 dark:bg-muted/20 border-slate-200/70 dark:border-border/60 text-muted-foreground hover:border-slate-300 dark:hover:border-border"
-                  )}
-                >
-                  <Checkbox
-                    id="equipment-speakers"
-                    checked={equipmentSpeakers}
-                    onCheckedChange={(c) => setEquipmentSpeakers(!!c)}
-                  />
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Speaker className="h-4 w-4 text-purple-500 shrink-0" />
-                    <span className="text-xs font-semibold">Sound System / Speakers</span>
-                  </div>
-                </div>
-              </div>
-
+            {/* ── REQUEST & AV (OPTIONAL) ── */}
+            <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-border/60">
               {/* Room Specific Facility Elements if any */}
               {selectedRoom &&
                 selectedRoom.elements &&
                 selectedRoom.elements.length > 0 && (
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-2">
                     <span className="text-[11px] font-semibold text-muted-foreground">
                       Available Room Elements:
                     </span>
@@ -1402,10 +1322,10 @@ export default function NewReservationPage() {
                   </div>
                 )}
 
-              {/* Custom Typed Request (Optional) */}
-              <div className="space-y-1.5 pt-1">
+              {/* Custom Typed Request & AV (Optional) */}
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                  Special AV &amp; Equipment Request <span className="text-muted-foreground font-normal">(Optional)</span>
+                  Request &amp; AV <span className="text-muted-foreground font-normal">(Optional)</span>
                 </label>
                 <Textarea
                   rows={2}
