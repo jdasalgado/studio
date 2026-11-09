@@ -148,6 +148,11 @@ export default function UpdatePasswordPage() {
       return;
     }
 
+    if (password.length > 64) {
+      toast({ variant: "destructive", title: "Error", description: "Password must not exceed 64 characters." });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({ password });
@@ -235,8 +240,9 @@ export default function UpdatePasswordPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     required
+                    maxLength={64}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value.slice(0, 64))}
                     placeholder="Enter new password (min. 6 chars)"
                     minLength={6}
                     className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/30 pr-10"
@@ -258,8 +264,9 @@ export default function UpdatePasswordPage() {
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     required
+                    maxLength={64}
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => setConfirmPassword(e.target.value.slice(0, 64))}
                     placeholder="Confirm new password"
                     minLength={6}
                     className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/30 pr-10"

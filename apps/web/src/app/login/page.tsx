@@ -91,6 +91,15 @@ export default function LoginPage() {
       return;
     }
 
+    if (password.length > 64) {
+      toast({
+        variant: "destructive",
+        title: "Password Too Long",
+        description: "Password must not exceed 64 characters.",
+      });
+      return;
+    }
+
     setIsSigningIn(true);
     try {
       const validation = await validateLoginIdentifier(identifier.trim(), "worker");
@@ -310,8 +319,9 @@ export default function LoginPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   required
+                  maxLength={64}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value.slice(0, 64))}
                   disabled={isSigningIn}
                   onKeyDown={(e) => e.key === "Enter" && handleSignIn()}
                   className="pr-10 h-11 sm:h-10 text-sm font-sans"

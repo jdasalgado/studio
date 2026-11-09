@@ -535,9 +535,10 @@ export default function QRScannerPage() {
                         <div className="relative">
                             <input
                                 type={showPassword ? "text" : "password"}
+                                maxLength={64}
                                 className="flex h-11 w-full rounded-xl border border-input/80 bg-background/90 px-3.5 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all font-medium"
                                 value={passwordInput}
-                                onChange={e => setPasswordInput(e.target.value)}
+                                onChange={e => setPasswordInput(e.target.value.slice(0, 64))}
                                 autoFocus
                             />
                             <button
