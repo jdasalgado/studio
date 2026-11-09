@@ -724,6 +724,7 @@ const DevotionForm = ({
   // Camera Capture State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [tempCapturedPhoto, setTempCapturedPhoto] = useState<string | null>(null);
@@ -732,6 +733,27 @@ const DevotionForm = ({
   const nativeCameraInputRef = useRef<HTMLInputElement>(null);
   const photoLibraryInputRef = useRef<HTMLInputElement>(null);
   const chooseFilesInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window === "undefined") return;
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isCoarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      const isNarrow = window.innerWidth < 768;
+      setIsMobileDevice(isMobileUA || (isCoarse && isNarrow));
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handlePhotoTrigger = () => {
+    if (isMobileDevice) {
+      setIsPhotoMenuOpen((prev) => !prev);
+    } else {
+      chooseFilesInputRef.current?.click();
+    }
+  };
 
   useEffect(() => {
     if (devotion) {
@@ -1334,10 +1356,10 @@ const DevotionForm = ({
         />
 
         {photoUrls.length === 0 ? (
-          <div>
+          <div className="relative inline-block">
             <button
               type="button"
-              onClick={() => setIsPhotoMenuOpen(true)}
+              onClick={handlePhotoTrigger}
               className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sidebar/80 active:scale-95 bg-white dark:bg-muted/10 hover:bg-slate-50 dark:hover:bg-muted/20 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer group shadow-2xs"
             >
               <div className="text-slate-500 dark:text-slate-400 group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
@@ -1347,6 +1369,59 @@ const DevotionForm = ({
                 Add photo
               </span>
             </button>
+
+            {/* ── MOBILE ONLY ACTION MENU (Anchored directly above Add photo button - Image 2) ── */}
+            {isPhotoMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-transparent"
+                  onClick={() => setIsPhotoMenuOpen(false)}
+                />
+                <div
+                  className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234]/98 text-white backdrop-blur-2xl border border-white/15 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPhotoMenuOpen(false);
+                      chooseFilesInputRef.current?.click();
+                    }}
+                    className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                  >
+                    <Folder className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+                    <span className="text-sm font-medium text-white tracking-normal">Choose Files</span>
+                  </button>
+
+                  <div className="h-px w-full bg-white/10 my-0.5" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPhotoMenuOpen(false);
+                      startCamera("environment");
+                    }}
+                    className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                  >
+                    <Camera className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+                    <span className="text-sm font-medium text-white tracking-normal">Take Photo</span>
+                  </button>
+
+                  <div className="h-px w-full bg-white/10 my-0.5" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPhotoMenuOpen(false);
+                      photoLibraryInputRef.current?.click();
+                    }}
+                    className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                  >
+                    <Images className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+                    <span className="text-sm font-medium text-white tracking-normal">Photo Library</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex items-start gap-3">
@@ -1372,74 +1447,73 @@ const DevotionForm = ({
                 <CheckCircle2 className="h-3.5 w-3.5" /> Photo Proof Attached
               </span>
 
-              <div>
+              <div className="relative inline-block">
                 <button
                   type="button"
-                  onClick={() => setIsPhotoMenuOpen(true)}
+                  onClick={handlePhotoTrigger}
                   className="text-xs font-semibold text-sidebar dark:text-sky-400 hover:underline cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <RefreshCw className="h-3 w-3" />
                   <span>Change photo</span>
                 </button>
+
+                {isPhotoMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40 bg-transparent"
+                      onClick={() => setIsPhotoMenuOpen(false)}
+                    />
+                    <div
+                      className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234]/98 text-white backdrop-blur-2xl border border-white/15 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPhotoMenuOpen(false);
+                          chooseFilesInputRef.current?.click();
+                        }}
+                        className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                      >
+                        <Folder className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+                        <span className="text-sm font-medium text-white tracking-normal">Choose Files</span>
+                      </button>
+
+                      <div className="h-px w-full bg-white/10 my-0.5" />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPhotoMenuOpen(false);
+                          startCamera("environment");
+                        }}
+                        className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                      >
+                        <Camera className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+                        <span className="text-sm font-medium text-white tracking-normal">Take Photo</span>
+                      </button>
+
+                      <div className="h-px w-full bg-white/10 my-0.5" />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPhotoMenuOpen(false);
+                          photoLibraryInputRef.current?.click();
+                        }}
+                        className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                      >
+                        <Images className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+                        <span className="text-sm font-medium text-white tracking-normal">Photo Library</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* ── PHOTO SOURCE ACTION MENU MODAL (Matches Reference Image) ── */}
-      {isPhotoMenuOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-150"
-          onClick={() => setIsPhotoMenuOpen(false)}
-        >
-          <div
-            className="w-full max-w-[280px] overflow-hidden rounded-[26px] bg-[#323234]/95 text-white backdrop-blur-2xl border border-white/10 shadow-2xl p-1.5 animate-in zoom-in-95 duration-150 select-none"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setIsPhotoMenuOpen(false);
-                photoLibraryInputRef.current?.click();
-              }}
-              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-            >
-              <Images className="h-6 w-6 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-              <span className="text-[15px] font-medium text-white tracking-normal">Photo Library</span>
-            </button>
-
-            <div className="h-px w-full bg-white/10 my-0.5" />
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsPhotoMenuOpen(false);
-                startCamera("environment");
-              }}
-              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-            >
-              <Camera className="h-6 w-6 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-              <span className="text-[15px] font-medium text-white tracking-normal">Take Photo</span>
-            </button>
-
-            <div className="h-px w-full bg-white/10 my-0.5" />
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsPhotoMenuOpen(false);
-                chooseFilesInputRef.current?.click();
-              }}
-              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
-            >
-              <Folder className="h-6 w-6 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-              <span className="text-[15px] font-medium text-white tracking-normal">Choose Files</span>
-            </button>
-          </div>
-        </div>
-      )}
-      </div>
+    </div>
 
       {/* ── LIVE CAMERA VIEWFINDER DIALOG ── */}
       <Dialog open={isCameraOpen} onOpenChange={(open) => !open && stopCamera()}>
