@@ -144,7 +144,7 @@ export const WORDA_MINISTRIES_BY_DEPT = {
   Outreach: ["cluster 1", "cluster 2", "cluster 3", "cluster 4", "cluster 5", "cluster 6", "cluster 7", "cluster 8", "cluster 9", "weyj", "tapat"],
   Relationship: ["sports", "gem", "ushering", "mens", "ladies", "youth empowered", "young adults", "worker"],
   Discipleship: ["j12", "oneliner", "cldp", "kid", "children's ministry", "life institute", "kca"],
-  Administration: ["arts", "engineering", "finance", "in house", "linkages", "security and shuttle", "technology", "ventures"],
+  Administration: ["general", "arts", "engineering", "finance", "in house", "linkages", "security and shuttle", "technology", "ventures"],
 };
 
 export type WordaDepartment = keyof typeof WORDA_MINISTRIES_BY_DEPT;

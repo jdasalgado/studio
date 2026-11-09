@@ -124,29 +124,64 @@ export default function NewReservationPage() {
     queryFn: getMinistries,
   });
 
+  const isAdminUser = useMemo(() => {
+    return Boolean(
+      isSuperAdmin ||
+      (workerProfile as any)?.role === "Administrator" ||
+      (workerProfile as any)?.role === "Super Admin" ||
+      (workerProfile as any)?.role?.name?.toLowerCase().includes("admin") ||
+      (workerProfile as any)?.role?.isSuperAdmin ||
+      user?.email?.toLowerCase().includes("admin") ||
+      user?.email === "jdeyb300@gmail.com" ||
+      workerProfile?.email === "jdeyb300@gmail.com"
+    );
+  }, [isSuperAdmin, workerProfile, user]);
+
+  const generalMinistry = useMemo(() => {
+    if (!ministries || ministries.length === 0) return null;
+    return (
+      ministries.find(
+        (m: any) =>
+          m.id === "A-GENERAL" ||
+          m.name?.toLowerCase() === "general"
+      ) || null
+    );
+  }, [ministries]);
+
   const userMinistry = useMemo(() => {
+    if (isAdminUser) {
+      return generalMinistry || { id: "A-GENERAL", name: "General" };
+    }
     if (!ministries || ministries.length === 0) return null;
     const targetId =
       ministryId ||
       workerProfile?.majorMinistryId ||
       (myMinistryIds && myMinistryIds.length > 0 ? myMinistryIds[0] : null);
     if (targetId) {
-      return ministries.find((m: any) => m.id === targetId);
+      return ministries.find((m: any) => m.id === targetId) || generalMinistry || ministries[0];
     }
-    return ministries[0] || null;
-  }, [ministries, ministryId, workerProfile, myMinistryIds]);
+    return generalMinistry || ministries[0] || null;
+  }, [ministries, ministryId, workerProfile, myMinistryIds, isAdminUser, generalMinistry]);
 
   useEffect(() => {
+    if (isAdminUser) {
+      const gId = generalMinistry?.id || "A-GENERAL";
+      if (ministryId !== gId) {
+        setMinistryId(gId);
+      }
+      return;
+    }
     if (!ministryId && ministries && ministries.length > 0) {
       const targetId =
         workerProfile?.majorMinistryId ||
         (myMinistryIds && myMinistryIds.length > 0 ? myMinistryIds[0] : null) ||
+        generalMinistry?.id ||
         ministries[0].id;
       if (targetId) {
         setMinistryId(targetId);
       }
     }
-  }, [ministryId, ministries, workerProfile, myMinistryIds]);
+  }, [ministryId, ministries, workerProfile, myMinistryIds, isAdminUser, generalMinistry]);
 
   const { data: venueElements } = useQuery({
     queryKey: ["venue-elements"],
@@ -340,12 +375,12 @@ export default function NewReservationPage() {
     }
 
     const effectiveMinistryId =
+      (isAdminUser ? (generalMinistry?.id || "A-GENERAL") : "") ||
       ministryId ||
       userMinistry?.id ||
       workerProfile?.majorMinistryId ||
       (myMinistryIds && myMinistryIds[0]) ||
-      (ministries && ministries[0]?.id) ||
-      "";
+      (generalMinistry?.id || "A-GENERAL");
 
     if (!effectiveMinistryId) {
       toast({
@@ -546,13 +581,6 @@ export default function NewReservationPage() {
         workerProfile?.id || "worker-system-admin";
 
       // If user is Admin or Ministry Head, skip Ministry approval and go directly to Admin approval
-      const isAdminUser = Boolean(
-        isSuperAdmin ||
-        (workerProfile as any)?.role === "Administrator" ||
-        (workerProfile as any)?.role === "Super Admin" ||
-        (workerProfile as any)?.role?.name?.toLowerCase().includes("admin") ||
-        (workerProfile as any)?.role?.isSuperAdmin
-      );
       const isPrivileged = Boolean(isAdminUser || isMinistryHead);
       const initialStatus = isPrivileged
         ? "Pending Admin Approval"
@@ -870,7 +898,7 @@ export default function NewReservationPage() {
                   Ministry
                 </label>
                 <Input
-                  value={userMinistry?.name || "General Ministry"}
+                  value={isAdminUser ? "General" : (userMinistry?.name || "General")}
                   disabled
                   className="bg-slate-50/90 dark:bg-muted/30 border border-slate-200/80 dark:border-border text-slate-600 dark:text-slate-300 rounded-xl h-10 text-xs font-normal cursor-not-allowed shadow-2xs"
                 />
