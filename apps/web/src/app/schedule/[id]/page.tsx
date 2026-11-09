@@ -787,9 +787,12 @@ export default function ScheduleDetailPage() {
                             <div className="space-y-3 mt-2">
                                 <div className="flex gap-2">
                                     <Input
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         placeholder="Enter Worker ID (e.g. 3320)"
                                         value={workerIdSearch}
-                                        onChange={e => setWorkerIdSearch(e.target.value)}
+                                        onChange={e => setWorkerIdSearch(e.target.value.replace(/\D/g, ""))}
                                         onKeyDown={e => e.key === "Enter" && handleWorkerIdSearch()}
                                         autoFocus
                                     />

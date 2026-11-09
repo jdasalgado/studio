@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, Button } from "@studio/ui";

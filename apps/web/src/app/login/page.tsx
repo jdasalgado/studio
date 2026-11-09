@@ -82,6 +82,15 @@ export default function LoginPage() {
       return;
     }
 
+    if (!/^\d+$/.test(identifier.trim())) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Worker ID",
+        description: "Worker ID must contain numbers only.",
+      });
+      return;
+    }
+
     setIsSigningIn(true);
     try {
       const validation = await validateLoginIdentifier(identifier.trim(), "worker");
@@ -223,10 +232,15 @@ export default function LoginPage() {
               <Input
                 id="identifier"
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="e.g. 01042"
                 required
                 value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
+                onChange={(e) => {
+                  const numbersOnly = e.target.value.replace(/\D/g, "");
+                  setIdentifier(numbersOnly);
+                }}
                 disabled={isSigningIn}
                 onKeyDown={(e) => e.key === "Enter" && handleSignIn()}
                 className="h-11 sm:h-10 text-sm font-sans"
