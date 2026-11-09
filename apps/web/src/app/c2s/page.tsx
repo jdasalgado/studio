@@ -97,6 +97,9 @@ import {
   GraduationCap,
   MapPin,
   Image as ImageIcon,
+  ImagePlus,
+  Images,
+  Folder,
   CheckCircle2,
   Sparkles,
   Heart,
@@ -726,6 +729,8 @@ const DevotionForm = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nativeCameraInputRef = useRef<HTMLInputElement>(null);
+  const photoLibraryInputRef = useRef<HTMLInputElement>(null);
+  const chooseFilesInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (devotion) {
@@ -1286,27 +1291,30 @@ const DevotionForm = ({
         />
       </div>
 
-      {/* â”€â”€ ROW 5: PHOTO PROOF â”€â”€ */}
-      <div className="rounded-2xl border border-border/70 bg-slate-50/60 dark:bg-muted/20 p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-sidebar/10 text-sidebar dark:text-sky-400 shrink-0">
-            <Camera className="h-3.5 w-3.5" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-foreground">Photo Proof <span className="text-red-500 ml-0.5">*</span></p>
-            <p className="text-[11px] text-muted-foreground">Upload picture of the devotion session as verification.</p>
-          </div>
-        </div>
+      {/* ── ROW 5: PHOTO (OPTIONAL) ── */}
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-gray-700 dark:text-gray-300 tracking-wider uppercase flex items-center gap-1">
+          PHOTO <span className="text-muted-foreground font-normal lowercase">(optional)</span>
+        </label>
 
-        {/* Advice banner for users */}
-        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 text-amber-900 dark:text-amber-200 text-xs leading-relaxed">
-          <Sparkles className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span>
-            <strong>Photo Advice:</strong> Take or upload session photo in <strong>Landscape (horizontal)</strong> format, max <strong>25MB</strong> (JPG, PNG, HEIC) for optimal display on feeds.
-          </span>
-        </div>
-
-        {/* Hidden Native Device Camera Fallback */}
+        {/* Hidden File Inputs */}
+        {/* 1. Photo Library (Gallery) */}
+        <input
+          ref={photoLibraryInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        {/* 2. Choose Files (All formats) */}
+        <input
+          ref={chooseFilesInputRef}
+          type="file"
+          accept="image/*,.heic,.png,.jpg,.jpeg,.webp"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        {/* 3. Native Camera Fallback */}
         <input
           ref={nativeCameraInputRef}
           type="file"
@@ -1317,82 +1325,116 @@ const DevotionForm = ({
         />
 
         {photoUrls.length === 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Option 1: Live Camera / Take Photo */}
-            <button
-              type="button"
-              onClick={() => startCamera("environment")}
-              className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-sidebar/40 dark:border-sky-500/40 hover:border-sidebar bg-sidebar/5 dark:bg-sidebar/10 hover:bg-sidebar/10 rounded-2xl transition-all text-center group cursor-pointer shadow-2xs"
-            >
-              <div className="w-11 h-11 rounded-2xl bg-sidebar text-white flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform shadow-xs">
-                <Camera className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-foreground group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
-                Take Photo
-              </p>
-              <p className="text-[10.5px] text-muted-foreground mt-0.5">
-                Use camera to snap live session
-              </p>
-            </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sidebar/80 bg-white dark:bg-muted/10 hover:bg-slate-50 dark:hover:bg-muted/20 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer group shadow-2xs"
+              >
+                <div className="text-slate-500 dark:text-slate-400 group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
+                  <ImagePlus className="h-7 w-7 stroke-[1.6]" />
+                </div>
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 group-hover:text-foreground transition-colors">
+                  Add photo
+                </span>
+              </button>
+            </DropdownMenuTrigger>
 
-            {/* Option 2: Upload File from Device */}
-            <label className="cursor-pointer flex flex-col items-center justify-center p-5 border-2 border-dashed border-slate-200/90 dark:border-border hover:border-sidebar/60 bg-white dark:bg-background rounded-2xl transition-all text-center group shadow-2xs">
-              <input
-                type="file"
-                accept=".png,.jpg,.jpeg,image/png,image/jpeg,image/webp"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-muted text-slate-700 dark:text-slate-200 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform shadow-2xs">
-                <UploadCloud className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-foreground group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
-                Upload from Device
-              </p>
-              <p className="text-[10.5px] text-muted-foreground mt-0.5">
-                Choose existing photo (up to 25MB)
-              </p>
-            </label>
-          </div>
+            <DropdownMenuContent
+              align="start"
+              sideOffset={8}
+              className="w-56 p-1.5 rounded-2xl bg-zinc-800/95 dark:bg-zinc-900/95 text-white backdrop-blur-xl border border-white/10 shadow-2xl space-y-0.5 z-50 animate-in fade-in-0 zoom-in-95"
+            >
+              <DropdownMenuItem
+                onClick={() => photoLibraryInputRef.current?.click()}
+                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
+              >
+                <Images className="h-5 w-5 text-white/80" />
+                <span>Photo Library</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => startCamera("environment")}
+                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
+              >
+                <Camera className="h-5 w-5 text-white/80" />
+                <span>Take Photo</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => chooseFilesInputRef.current?.click()}
+                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
+              >
+                <Folder className="h-5 w-5 text-white/80" />
+                <span>Choose Files</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
-          <div className="space-y-2.5">
-            <div className="relative aspect-video max-h-56 w-full rounded-2xl overflow-hidden border border-border/80 bg-black/5 flex items-center justify-center shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border border-border/80 bg-black/5 shadow-2xs group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photoUrls[0]} alt="Proof photo" className="w-full h-full object-contain" />
+              <img
+                src={photoUrls[0]}
+                alt="Proof photo"
+                className="w-full h-full object-cover"
+              />
               <button
                 type="button"
                 onClick={handleRemovePhoto}
-                className="absolute top-2.5 right-2.5 bg-black/75 hover:bg-destructive text-white rounded-full p-1.5 shadow-md transition-colors cursor-pointer"
+                className="absolute top-1.5 right-1.5 bg-black/75 hover:bg-destructive text-white rounded-full p-1 shadow-md transition-colors cursor-pointer"
                 title="Remove photo"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-2 px-1">
+            <div className="pt-2 space-y-1.5">
               <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Photo Proof Attached
+                <CheckCircle2 className="h-3.5 w-3.5" /> Photo Attached
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => startCamera("environment")}
-                  className="text-xs font-semibold text-sidebar dark:text-sky-400 hover:underline cursor-pointer inline-flex items-center gap-1"
-                >
-                  <Camera className="h-3 w-3" />
-                  <span>Retake</span>
-                </button>
-                <span className="text-muted-foreground text-xs">&bull;</span>
-                <label className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline cursor-pointer inline-flex items-center gap-1">
-                  <input
-                    type="file"
-                    accept=".png,.jpg,.jpeg,image/png,image/jpeg,image/webp"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <UploadCloud className="h-3 w-3" />
-                  <span>Change File</span>
-                </label>
+
+              <div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-sidebar dark:text-sky-400 hover:underline cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      <span>Change photo</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-56 p-1.5 rounded-2xl bg-zinc-800/95 dark:bg-zinc-900/95 text-white backdrop-blur-xl border border-white/10 shadow-2xl space-y-0.5 z-50 animate-in fade-in-0 zoom-in-95"
+                  >
+                    <DropdownMenuItem
+                      onClick={() => photoLibraryInputRef.current?.click()}
+                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
+                    >
+                      <Images className="h-5 w-5 text-white/80" />
+                      <span>Photo Library</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => startCamera("environment")}
+                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
+                    >
+                      <Camera className="h-5 w-5 text-white/80" />
+                      <span>Take Photo</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => chooseFilesInputRef.current?.click()}
+                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
+                    >
+                      <Folder className="h-5 w-5 text-white/80" />
+                      <span>Choose Files</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
