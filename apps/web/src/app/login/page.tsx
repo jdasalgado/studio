@@ -91,6 +91,15 @@ export default function LoginPage() {
       return;
     }
 
+    if (identifier.trim().length > 6) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Worker ID",
+        description: "Worker ID must not exceed 6 digits.",
+      });
+      return;
+    }
+
     if (password.length > 64) {
       toast({
         variant: "destructive",
@@ -245,9 +254,10 @@ export default function LoginPage() {
                 pattern="[0-9]*"
                 placeholder="e.g. 01042"
                 required
+                maxLength={6}
                 value={identifier}
                 onChange={(e) => {
-                  const numbersOnly = e.target.value.replace(/\D/g, "");
+                  const numbersOnly = e.target.value.replace(/\D/g, "").slice(0, 6);
                   setIdentifier(numbersOnly);
                 }}
                 disabled={isSigningIn}
