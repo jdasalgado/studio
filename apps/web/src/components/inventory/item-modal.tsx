@@ -483,8 +483,8 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                 </span>
               </div>
 
-              {/* Row 1: Stock, Min Stock, Unit */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5 w-full min-w-0">
+              {/* Row 1: Stock, Min Stock */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5 w-full min-w-0">
                 <div className="space-y-1.5 min-w-0">
                   <Label htmlFor="current-stock" className="text-xs font-semibold text-foreground/85">
                     Current Stock
@@ -521,20 +521,6 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                       const num = raw === "" ? 0 : Math.min(parseInt(raw, 10) || 0, 999999);
                       setFormData({ ...formData, minStock: num });
                     }}
-                    className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 font-medium text-foreground focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5 min-w-0">
-                  <Label htmlFor="unit" className="text-xs font-semibold text-foreground/85">
-                    Unit
-                  </Label>
-                  <Input
-                    id="unit"
-                    maxLength={20}
-                    placeholder="pcs, box, roll"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value.slice(0, 20) })}
                     className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 font-medium text-foreground focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                   />
                 </div>
