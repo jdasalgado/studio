@@ -1378,7 +1378,8 @@ const DevotionForm = ({
                   onClick={() => setIsPhotoMenuOpen(false)}
                 />
                 <div
-                  className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234]/98 text-white backdrop-blur-2xl border border-white/15 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
+                  style={{ backgroundColor: "#323234" }}
+                  className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
                 >
                   <button
                     type="button"
@@ -1388,11 +1389,11 @@ const DevotionForm = ({
                     }}
                     className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                   >
-                    <Folder className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-                    <span className="text-sm font-medium text-white tracking-normal">Choose Files</span>
+                    <Folder className="h-5 w-5 text-white shrink-0" />
+                    <span className="text-sm font-semibold text-white tracking-normal">Choose Files</span>
                   </button>
 
-                  <div className="h-px w-full bg-white/10 my-0.5" />
+                  <div className="h-px w-full bg-white/20 my-0.5" />
 
                   <button
                     type="button"
@@ -1402,11 +1403,11 @@ const DevotionForm = ({
                     }}
                     className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                   >
-                    <Camera className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-                    <span className="text-sm font-medium text-white tracking-normal">Take Photo</span>
+                    <Camera className="h-5 w-5 text-white shrink-0" />
+                    <span className="text-sm font-semibold text-white tracking-normal">Take Photo</span>
                   </button>
 
-                  <div className="h-px w-full bg-white/10 my-0.5" />
+                  <div className="h-px w-full bg-white/20 my-0.5" />
 
                   <button
                     type="button"
@@ -1416,8 +1417,8 @@ const DevotionForm = ({
                     }}
                     className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                   >
-                    <Images className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-                    <span className="text-sm font-medium text-white tracking-normal">Photo Library</span>
+                    <Images className="h-5 w-5 text-white shrink-0" />
+                    <span className="text-sm font-semibold text-white tracking-normal">Photo Library</span>
                   </button>
                 </div>
               </>
@@ -1464,7 +1465,8 @@ const DevotionForm = ({
                       onClick={() => setIsPhotoMenuOpen(false)}
                     />
                     <div
-                      className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234]/98 text-white backdrop-blur-2xl border border-white/15 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
+                      style={{ backgroundColor: "#323234" }}
+                      className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
                     >
                       <button
                         type="button"
@@ -1474,11 +1476,11 @@ const DevotionForm = ({
                         }}
                         className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                       >
-                        <Folder className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-                        <span className="text-sm font-medium text-white tracking-normal">Choose Files</span>
+                        <Folder className="h-5 w-5 text-white shrink-0" />
+                        <span className="text-sm font-semibold text-white tracking-normal">Choose Files</span>
                       </button>
 
-                      <div className="h-px w-full bg-white/10 my-0.5" />
+                      <div className="h-px w-full bg-white/20 my-0.5" />
 
                       <button
                         type="button"
@@ -1488,11 +1490,11 @@ const DevotionForm = ({
                         }}
                         className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                       >
-                        <Camera className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-                        <span className="text-sm font-medium text-white tracking-normal">Take Photo</span>
+                        <Camera className="h-5 w-5 text-white shrink-0" />
+                        <span className="text-sm font-semibold text-white tracking-normal">Take Photo</span>
                       </button>
 
-                      <div className="h-px w-full bg-white/10 my-0.5" />
+                      <div className="h-px w-full bg-white/20 my-0.5" />
 
                       <button
                         type="button"
@@ -1502,8 +1504,8 @@ const DevotionForm = ({
                         }}
                         className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                       >
-                        <Images className="h-5 w-5 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
-                        <span className="text-sm font-medium text-white tracking-normal">Photo Library</span>
+                        <Images className="h-5 w-5 text-white shrink-0" />
+                        <span className="text-sm font-semibold text-white tracking-normal">Photo Library</span>
                       </button>
                     </div>
                   </>
