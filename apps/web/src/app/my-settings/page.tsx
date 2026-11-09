@@ -544,18 +544,24 @@ function MySettingsContent() {
                         </p>
 
                         <div className="bg-slate-50 dark:bg-muted/40 rounded-xl p-3.5 border border-border/60 space-y-2 text-xs">
-                          <div className="flex justify-between items-center py-1 border-b border-border/40">
-                            <span className="text-muted-foreground">New Display Name</span>
-                            <span className="font-semibold text-foreground">
-                              {firstName.trim()} {lastName.trim()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center py-1">
-                            <span className="text-muted-foreground">New Email Address</span>
-                            <span className="font-semibold text-foreground truncate max-w-[200px]" title={email.trim()}>
-                              {email.trim()}
-                            </span>
-                          </div>
+                          {/* Only show name row if name was changed */}
+                          {(`${firstName.trim()} ${lastName.trim()}` !== `${(workerProfile?.firstName || "").trim()} ${(workerProfile?.lastName || "").trim()}`) && (
+                            <div className="flex justify-between items-center py-1 last:border-b-0">
+                              <span className="text-muted-foreground">New Display Name</span>
+                              <span className="font-semibold text-foreground">
+                                {firstName.trim()} {lastName.trim()}
+                              </span>
+                            </div>
+                          )}
+                          {/* Only show email row if email was changed */}
+                          {(email.trim().toLowerCase() !== (workerProfile?.email || user?.email || "").trim().toLowerCase()) && (
+                            <div className="flex justify-between items-center py-1 last:border-b-0">
+                              <span className="text-muted-foreground">New Email Address</span>
+                              <span className="font-semibold text-foreground truncate max-w-[200px]" title={email.trim()}>
+                                {email.trim()}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {email.trim().toLowerCase() !== (workerProfile?.email || user?.email || "").trim().toLowerCase() && (
