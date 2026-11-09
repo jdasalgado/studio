@@ -102,7 +102,7 @@ export function UserRoleSyncerSQL() {
   // ── 4. Roles (for allRoles in store) ──────────────────────────────────────
   const { data: allRoles, isLoading: areRolesLoading } = useQuery({
     queryKey: ["roles"],
-    queryFn: getRoles,
+    queryFn: () => getRoles(),
     enabled: !!user,
     staleTime: 5 * 60_000,
   });

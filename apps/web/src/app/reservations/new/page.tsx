@@ -118,17 +118,17 @@ export default function NewReservationPage() {
   // Data fetching
   const { data: rooms } = useQuery({
     queryKey: ["rooms"],
-    queryFn: getRooms,
+    queryFn: () => getRooms(),
   });
 
   const { data: areas } = useQuery({
     queryKey: ["areas"],
-    queryFn: getAreas,
+    queryFn: () => getAreas(),
   });
 
   const { data: ministries } = useQuery({
     queryKey: ["ministries"],
-    queryFn: getMinistries,
+    queryFn: () => getMinistries(),
   });
 
   const isAdminUser = useMemo(() => {
@@ -192,7 +192,7 @@ export default function NewReservationPage() {
 
   const { data: venueElements } = useQuery({
     queryKey: ["venue-elements"],
-    queryFn: getVenueElements,
+    queryFn: () => getVenueElements(),
   });
 
   const selectedRoom = useMemo(() => {
