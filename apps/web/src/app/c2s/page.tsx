@@ -1379,7 +1379,7 @@ const DevotionForm = ({
                 />
                 <div
                   style={{ backgroundColor: "#323234" }}
-                  className="absolute top-0 left-0 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
+                  className="absolute top-0 left-0 z-50 w-44 sm:w-48 overflow-hidden rounded-2xl bg-[#323234] text-white border border-white/20 shadow-xl p-1 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
                 >
                   <button
                     type="button"
@@ -1387,10 +1387,10 @@ const DevotionForm = ({
                       setIsPhotoMenuOpen(false);
                       chooseFilesInputRef.current?.click();
                     }}
-                    className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                   >
-                    <Folder className="h-5 w-5 text-white shrink-0" />
-                    <span className="text-sm font-semibold text-white tracking-normal">Choose Files</span>
+                    <Folder className="h-4 w-4 text-white shrink-0" />
+                    <span className="text-xs font-semibold text-white tracking-normal">Choose Files</span>
                   </button>
 
                   <div className="h-px w-full bg-white/20 my-0.5" />
@@ -1401,10 +1401,10 @@ const DevotionForm = ({
                       setIsPhotoMenuOpen(false);
                       startCamera("environment");
                     }}
-                    className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                   >
-                    <Camera className="h-5 w-5 text-white shrink-0" />
-                    <span className="text-sm font-semibold text-white tracking-normal">Take Photo</span>
+                    <Camera className="h-4 w-4 text-white shrink-0" />
+                    <span className="text-xs font-semibold text-white tracking-normal">Take Photo</span>
                   </button>
 
                   <div className="h-px w-full bg-white/20 my-0.5" />
@@ -1415,10 +1415,10 @@ const DevotionForm = ({
                       setIsPhotoMenuOpen(false);
                       photoLibraryInputRef.current?.click();
                     }}
-                    className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                   >
-                    <Images className="h-5 w-5 text-white shrink-0" />
-                    <span className="text-sm font-semibold text-white tracking-normal">Photo Library</span>
+                    <Images className="h-4 w-4 text-white shrink-0" />
+                    <span className="text-xs font-semibold text-white tracking-normal">Photo Library</span>
                   </button>
                 </div>
               </>
@@ -1466,7 +1466,7 @@ const DevotionForm = ({
                     />
                     <div
                       style={{ backgroundColor: "#323234" }}
-                      className="absolute top-0 left-0 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
+                      className="absolute top-0 left-0 z-50 w-44 sm:w-48 overflow-hidden rounded-2xl bg-[#323234] text-white border border-white/20 shadow-xl p-1 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
                     >
                       <button
                         type="button"
@@ -1474,10 +1474,10 @@ const DevotionForm = ({
                           setIsPhotoMenuOpen(false);
                           chooseFilesInputRef.current?.click();
                         }}
-                        className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                       >
-                        <Folder className="h-5 w-5 text-white shrink-0" />
-                        <span className="text-sm font-semibold text-white tracking-normal">Choose Files</span>
+                        <Folder className="h-4 w-4 text-white shrink-0" />
+                        <span className="text-xs font-semibold text-white tracking-normal">Choose Files</span>
                       </button>
 
                       <div className="h-px w-full bg-white/20 my-0.5" />
@@ -1488,10 +1488,10 @@ const DevotionForm = ({
                           setIsPhotoMenuOpen(false);
                           startCamera("environment");
                         }}
-                        className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                       >
-                        <Camera className="h-5 w-5 text-white shrink-0" />
-                        <span className="text-sm font-semibold text-white tracking-normal">Take Photo</span>
+                        <Camera className="h-4 w-4 text-white shrink-0" />
+                        <span className="text-xs font-semibold text-white tracking-normal">Take Photo</span>
                       </button>
 
                       <div className="h-px w-full bg-white/20 my-0.5" />
@@ -1502,10 +1502,10 @@ const DevotionForm = ({
                           setIsPhotoMenuOpen(false);
                           photoLibraryInputRef.current?.click();
                         }}
-                        className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
                       >
-                        <Images className="h-5 w-5 text-white shrink-0" />
-                        <span className="text-sm font-semibold text-white tracking-normal">Photo Library</span>
+                        <Images className="h-4 w-4 text-white shrink-0" />
+                        <span className="text-xs font-semibold text-white tracking-normal">Photo Library</span>
                       </button>
                     </div>
                   </>
