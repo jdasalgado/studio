@@ -2008,6 +2008,28 @@ export async function getBookings(filters: {
     });
 }
 
+export async function getBookingById(id: string) {
+    if (!id) return null;
+    return await prisma.booking.findUnique({
+        where: { id },
+        include: {
+            room: true,
+            worker: {
+                select: {
+                    id: true,
+                    workerId: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                    majorMinistryId: true,
+                    minorMinistryId: true,
+                },
+            },
+        },
+    });
+}
+
 export async function getBookingsForRoomOnDate(roomId: string, date: Date | string) {
     let year: number;
     let month: number;

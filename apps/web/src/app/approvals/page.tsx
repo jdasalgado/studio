@@ -1227,6 +1227,7 @@ export default function ApprovalsPage() {
 
       <ApprovalDetailsDialog
         request={selectedRequest}
+        booking={bookings?.find((b) => b.id === selectedRequest?.reservationId)}
         open={!!selectedRequest}
         requesterWorker={workers?.find(w => w.id === selectedRequest?.workerId)}
         onOpenChange={open => { if (!open) setSelectedRequest(null); }}

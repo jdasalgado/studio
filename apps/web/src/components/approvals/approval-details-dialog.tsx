@@ -16,7 +16,12 @@ import {
   Building2,
   ShieldCheck,
   Sparkles,
+  Tv,
+  Mic,
+  Speaker,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getBookingById } from "@/actions/db";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { ApprovalRequest, Worker } from "@studio/types";
@@ -115,6 +120,7 @@ function getStatusDescription(type: ApprovalRequest["type"], status: ApprovalReq
 
 interface ApprovalDetailsDialogProps {
   request: ApprovalRequest | null;
+  booking?: any | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   requesterWorker?: Worker | null;
@@ -129,6 +135,7 @@ interface ApprovalDetailsDialogProps {
 
 export function ApprovalDetailsDialog({
   request,
+  booking,
   open,
   onOpenChange,
   requesterWorker,
@@ -140,6 +147,15 @@ export function ApprovalDetailsDialog({
   currentWorkerId,
   currentWorkerName,
 }: ApprovalDetailsDialogProps) {
+  const { data: fetchedBooking } = useQuery({
+    queryKey: ["approval-booking", request?.reservationId],
+    queryFn: () => (request?.reservationId ? getBookingById(request.reservationId) : null),
+    enabled: Boolean(request?.type === "Room Booking" && request?.reservationId && !booking && open),
+    staleTime: 30_000,
+  });
+
+  const activeBooking = booking || fetchedBooking;
+
   if (!request) return null;
 
   const reqDate = request.date ? new Date(request.date as any) : null;
@@ -322,15 +338,24 @@ export function ApprovalDetailsDialog({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {(() => {
-                  let purpose = request.details;
-                  let room = "";
-                  if (request.details) {
+                  let purpose = activeBooking?.purpose || request.details;
+                  let room = activeBooking?.room?.name || "";
+                  if (!room && request.details) {
                     const match = request.details.match(/^"?(.*?)"?\s+for room:\s*(.*)$/i);
                     if (match) {
                       purpose = match[1];
                       room = match[2];
                     }
                   }
+
+                  const requestedList: string[] = Array.isArray(activeBooking?.requestedElements)
+                    ? activeBooking.requestedElements
+                    : [];
+                  const hasTv = Boolean(activeBooking?.equipment_TV);
+                  const hasMic = Boolean(activeBooking?.equipment_Mic);
+                  const hasSpeakers = Boolean(activeBooking?.equipment_Speakers);
+                  const hasAnyAvOrElements = requestedList.length > 0 || hasTv || hasMic || hasSpeakers;
+
                   return (
                     <>
                       {room && (
@@ -350,6 +375,79 @@ export function ApprovalDetailsDialog({
                         <p className="text-xs font-semibold text-foreground mt-0.5">
                           {purpose || "—"}
                         </p>
+                      </div>
+
+                      {activeBooking?.start && (
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border/60 sm:col-span-2">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Schedule
+                          </p>
+                          <p className="text-xs font-semibold text-foreground mt-0.5">
+                            {format(new Date(activeBooking.start), "MMM d, yyyy • h:mm a")}
+                            {activeBooking.end ? ` - ${format(new Date(activeBooking.end), "h:mm a")}` : ""}
+                          </p>
+                        </div>
+                      )}
+
+                      {(activeBooking?.pax || activeBooking?.numTables || activeBooking?.numChairs) && (
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border/60 sm:col-span-2">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Attendance &amp; Setup
+                          </p>
+                          <p className="text-xs font-semibold text-foreground mt-0.5">
+                            {activeBooking.pax ? `${activeBooking.pax} pax` : ""}
+                            {activeBooking.numTables ? ` • ${activeBooking.numTables} tables` : ""}
+                            {activeBooking.numChairs ? ` • ${activeBooking.numChairs} chairs` : ""}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Request & AV Section */}
+                      <div className="col-span-full p-3.5 rounded-xl bg-slate-50/80 dark:bg-muted/30 border border-border/70 space-y-2">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          <Sparkles className="h-3.5 w-3.5 text-primary" />
+                          <span>Request &amp; AV</span>
+                        </div>
+
+                        {hasAnyAvOrElements ? (
+                          <div className="space-y-2">
+                            {(hasTv || hasMic || hasSpeakers) && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {hasTv && (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                    <Tv className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                    Television / Presentation
+                                  </span>
+                                )}
+                                {hasMic && (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                    <Mic className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                    Microphone &amp; Audio
+                                  </span>
+                                )}
+                                {hasSpeakers && (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                    <Speaker className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                                    Sound System / Speakers
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {requestedList.map((item: string, idx: number) => (
+                              <div
+                                key={idx}
+                                className="p-2.5 rounded-lg bg-background border border-border/60 text-xs font-medium text-foreground whitespace-pre-wrap leading-relaxed shadow-2xs"
+                              >
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">
+                            No special AV or equipment requested.
+                          </p>
+                        )}
                       </div>
                     </>
                   );
