@@ -53,6 +53,8 @@ import { isValidEmail, isValidName, cleanName, MAX_LENGTHS } from "@/lib/validat
 import { showSubmitSuccess, showSubmitError } from "@/hooks/use-submission-modal";
 import type { Room, Area, Ministry, VenueElement } from "@studio/types";
 
+const EMPTY_BOOKINGS: any[] = [];
+
 export default function NewReservationPage() {
   const { user } = useAuthStore();
   const { workerProfile, isSuperAdmin, isMinistryHead, myMinistryIds, isLoading: roleLoading } = useUserRole();
@@ -98,23 +100,6 @@ export default function NewReservationPage() {
     );
   }, []);
 
-  useEffect(() => {
-    if (workerProfile) {
-      setRequesterName(
-        `${workerProfile.firstName} ${workerProfile.lastName}`
-      );
-      setEmail(workerProfile.email || user?.email || "");
-      if (workerProfile.majorMinistryId) {
-        setMinistryId(workerProfile.majorMinistryId);
-      } else if (myMinistryIds && myMinistryIds.length > 0) {
-        setMinistryId(myMinistryIds[0]);
-      }
-    } else if (user) {
-      setRequesterName(user.email?.split("@")[0] || "System Admin");
-      setEmail(user.email || "admin@gmail.com");
-    }
-  }, [workerProfile, user, myMinistryIds]);
-
   // Data fetching
   const { data: rooms } = useQuery({
     queryKey: ["rooms"],
@@ -154,6 +139,28 @@ export default function NewReservationPage() {
       ) || null
     );
   }, [ministries]);
+
+  useEffect(() => {
+    if (workerProfile) {
+      setRequesterName(
+        `${workerProfile.firstName} ${workerProfile.lastName}`
+      );
+      setEmail(workerProfile.email || user?.email || "");
+      if (isAdminUser) {
+        setMinistryId(generalMinistry?.id || "A-GENERAL");
+      } else if (workerProfile.majorMinistryId) {
+        setMinistryId(workerProfile.majorMinistryId);
+      } else if (myMinistryIds && myMinistryIds.length > 0) {
+        setMinistryId(myMinistryIds[0]);
+      }
+    } else if (user) {
+      setRequesterName(user.email?.split("@")[0] || "System Admin");
+      setEmail(user.email || "admin@gmail.com");
+      if (isAdminUser) {
+        setMinistryId(generalMinistry?.id || "A-GENERAL");
+      }
+    }
+  }, [workerProfile, user, myMinistryIds, isAdminUser, generalMinistry]);
 
   const userMinistry = useMemo(() => {
     if (isAdminUser) {
@@ -212,7 +219,7 @@ export default function NewReservationPage() {
   }, [selectedRoom?.capacity]);
 
   // Fetch existing bookings for selected room on selected date
-  const { data: existingBookings = [], isLoading: isCheckingBookings } = useQuery({
+  const { data: existingBookings = EMPTY_BOOKINGS, isLoading: isCheckingBookings } = useQuery({
     queryKey: ["room-bookings", roomId, selectedDate],
     queryFn: async () => {
       if (!roomId || !selectedDate) return [];

@@ -75,6 +75,7 @@ function Select<T extends string = string>({
   const isOpen = isControlledOpen ? controlledOpen : uncontrolledOpen
 
   const [itemLabels, setItemLabels] = React.useState<Map<string, React.ReactNode>>(() => new Map())
+  const itemLabelsRef = React.useRef<Map<string, React.ReactNode>>(new Map())
 
   const extractedMap = React.useMemo(() => {
     return extractLabels(children)
@@ -87,15 +88,21 @@ function Select<T extends string = string>({
   }, [extractedMap, itemLabels])
 
   const registerItem = React.useCallback((val: string, label: React.ReactNode) => {
+    if (extractedMap.has(val)) return
+    if (itemLabelsRef.current.get(val) === label) return
+    itemLabelsRef.current.set(val, label)
     setItemLabels((prev) => {
       const next = new Map(prev)
       next.set(val, label)
       return next
     })
-  }, [])
+  }, [extractedMap])
 
   const unregisterItem = React.useCallback((val: string) => {
+    if (!itemLabelsRef.current.has(val)) return
+    itemLabelsRef.current.delete(val)
     setItemLabels((prev) => {
+      if (!prev.has(val)) return prev
       const next = new Map(prev)
       next.delete(val)
       return next
@@ -292,12 +299,15 @@ const SelectItem = React.forwardRef<HTMLButtonElement, SelectItemProps>(
       useSelectContext()
     const isSelected = selectedValue === value
 
+    const labelKey = typeof children === "string" || typeof children === "number" ? String(children) : null
+
     React.useEffect(() => {
       registerItem(value, children)
       return () => {
         unregisterItem(value)
       }
-    }, [value, children, registerItem, unregisterItem])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value, labelKey, registerItem, unregisterItem])
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation()
