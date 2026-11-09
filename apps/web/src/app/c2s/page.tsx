@@ -723,6 +723,7 @@ const DevotionForm = ({
 
   // Camera Capture State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [tempCapturedPhoto, setTempCapturedPhoto] = useState<string | null>(null);
@@ -1038,6 +1039,14 @@ const DevotionForm = ({
       });
       return;
     }
+    if (photoUrls.length === 0 || !photoUrls[0]) {
+      toast({
+        variant: "destructive",
+        title: "Photo Proof Required",
+        description: "Please attach a photo proof of the devotion session before submitting.",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -1291,10 +1300,10 @@ const DevotionForm = ({
         />
       </div>
 
-      {/* ── ROW 5: PHOTO (OPTIONAL) ── */}
+      {/* ── ROW 5: PHOTO (REQUIRED) ── */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-gray-700 dark:text-gray-300 tracking-wider uppercase flex items-center gap-1">
-          PHOTO <span className="text-muted-foreground font-normal lowercase">(optional)</span>
+          PHOTO <span className="text-red-500 font-bold">*</span>
         </label>
 
         {/* Hidden File Inputs */}
@@ -1325,51 +1334,20 @@ const DevotionForm = ({
         />
 
         {photoUrls.length === 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sidebar/80 bg-white dark:bg-muted/10 hover:bg-slate-50 dark:hover:bg-muted/20 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer group shadow-2xs"
-              >
-                <div className="text-slate-500 dark:text-slate-400 group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
-                  <ImagePlus className="h-7 w-7 stroke-[1.6]" />
-                </div>
-                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 group-hover:text-foreground transition-colors">
-                  Add photo
-                </span>
-              </button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              align="start"
-              sideOffset={8}
-              className="w-56 p-1.5 rounded-2xl bg-zinc-800/95 dark:bg-zinc-900/95 text-white backdrop-blur-xl border border-white/10 shadow-2xl space-y-0.5 z-50 animate-in fade-in-0 zoom-in-95"
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsPhotoMenuOpen(true)}
+              className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sidebar/80 active:scale-95 bg-white dark:bg-muted/10 hover:bg-slate-50 dark:hover:bg-muted/20 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer group shadow-2xs"
             >
-              <DropdownMenuItem
-                onClick={() => photoLibraryInputRef.current?.click()}
-                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
-              >
-                <Images className="h-5 w-5 text-white/80" />
-                <span>Photo Library</span>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onClick={() => startCamera("environment")}
-                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
-              >
-                <Camera className="h-5 w-5 text-white/80" />
-                <span>Take Photo</span>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onClick={() => chooseFilesInputRef.current?.click()}
-                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
-              >
-                <Folder className="h-5 w-5 text-white/80" />
-                <span>Choose Files</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <div className="text-slate-500 dark:text-slate-400 group-hover:text-sidebar dark:group-hover:text-sky-400 transition-colors">
+                <ImagePlus className="h-7 w-7 stroke-[1.6]" />
+              </div>
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300 group-hover:text-foreground transition-colors">
+                Add photo
+              </span>
+            </button>
+          </div>
         ) : (
           <div className="flex items-start gap-3">
             <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border border-border/80 bg-black/5 shadow-2xs group">
@@ -1391,55 +1369,76 @@ const DevotionForm = ({
 
             <div className="pt-2 space-y-1.5">
               <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Photo Attached
+                <CheckCircle2 className="h-3.5 w-3.5" /> Photo Proof Attached
               </span>
 
               <div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-sidebar dark:text-sky-400 hover:underline cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>Change photo</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    sideOffset={8}
-                    className="w-56 p-1.5 rounded-2xl bg-zinc-800/95 dark:bg-zinc-900/95 text-white backdrop-blur-xl border border-white/10 shadow-2xl space-y-0.5 z-50 animate-in fade-in-0 zoom-in-95"
-                  >
-                    <DropdownMenuItem
-                      onClick={() => photoLibraryInputRef.current?.click()}
-                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
-                    >
-                      <Images className="h-5 w-5 text-white/80" />
-                      <span>Photo Library</span>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => startCamera("environment")}
-                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
-                    >
-                      <Camera className="h-5 w-5 text-white/80" />
-                      <span>Take Photo</span>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => chooseFilesInputRef.current?.click()}
-                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-medium text-white/95 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer transition-colors"
-                    >
-                      <Folder className="h-5 w-5 text-white/80" />
-                      <span>Choose Files</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoMenuOpen(true)}
+                  className="text-xs font-semibold text-sidebar dark:text-sky-400 hover:underline cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Change photo</span>
+                </button>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* ── PHOTO SOURCE ACTION MENU MODAL (Matches Reference Image) ── */}
+      {isPhotoMenuOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-150"
+          onClick={() => setIsPhotoMenuOpen(false)}
+        >
+          <div
+            className="w-full max-w-[280px] overflow-hidden rounded-[26px] bg-[#323234]/95 text-white backdrop-blur-2xl border border-white/10 shadow-2xl p-1.5 animate-in zoom-in-95 duration-150 select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setIsPhotoMenuOpen(false);
+                photoLibraryInputRef.current?.click();
+              }}
+              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+            >
+              <Images className="h-6 w-6 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+              <span className="text-[15px] font-medium text-white tracking-normal">Photo Library</span>
+            </button>
+
+            <div className="h-px w-full bg-white/10 my-0.5" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPhotoMenuOpen(false);
+                startCamera("environment");
+              }}
+              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+            >
+              <Camera className="h-6 w-6 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+              <span className="text-[15px] font-medium text-white tracking-normal">Take Photo</span>
+            </button>
+
+            <div className="h-px w-full bg-white/10 my-0.5" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPhotoMenuOpen(false);
+                chooseFilesInputRef.current?.click();
+              }}
+              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-white/10 active:bg-white/20 transition-colors text-left cursor-pointer group"
+            >
+              <Folder className="h-6 w-6 text-white/90 group-hover:scale-105 transition-transform shrink-0" />
+              <span className="text-[15px] font-medium text-white tracking-normal">Choose Files</span>
+            </button>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* ── LIVE CAMERA VIEWFINDER DIALOG ── */}
