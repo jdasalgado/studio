@@ -864,6 +864,18 @@ export function InventoryTable({
                               <DropdownMenuItem
                                 className="gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer text-foreground/90 hover:text-foreground hover:bg-muted/70 transition-colors"
                                 onClick={() => {
+                                  setStockAdjustItem(item);
+                                  setAdjustAction('Stock In');
+                                  setAdjustQuantity(1);
+                                  setAdjustNote('');
+                                }}
+                              >
+                                <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>Adjust Stock</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer text-foreground/90 hover:text-foreground hover:bg-muted/70 transition-colors"
+                                onClick={() => {
                                   setModalItem(item);
                                   setIsItemModalOpen(true);
                                 }}
@@ -947,20 +959,6 @@ export function InventoryTable({
                               )}>
                                 {item.stock} {item.unit || 'pcs'}
                               </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setStockAdjustItem(item);
-                                  setAdjustAction('Stock In');
-                                  setAdjustQuantity(1);
-                                  setAdjustNote('');
-                                }}
-                                className="text-[10.5px] font-bold text-sidebar dark:text-sky-400 hover:underline cursor-pointer inline-flex items-center gap-1"
-                              >
-                                <SlidersHorizontal className="h-3 w-3" />
-                                <span>Adjust</span>
-                              </button>
                             </div>
                           </div>
 
@@ -1241,23 +1239,6 @@ export function InventoryTable({
                           {/* 8. Actions Column */}
                           <TableCell className="text-left pl-3 py-3">
                             <div className="flex items-center justify-start gap-1.5">
-                              {/* Professional Adjust Stock Button */}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setStockAdjustItem(item);
-                                  setAdjustAction('Stock In');
-                                  setAdjustQuantity(1);
-                                  setAdjustNote('');
-                                }}
-                                className="h-7 px-2.5 rounded-lg border-border/80 hover:bg-sidebar/10 hover:text-sidebar dark:hover:text-sky-400 hover:border-sidebar/30 text-xs font-semibold gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95"
-                                title="Adjust stock quantity"
-                              >
-                                <SlidersHorizontal className="h-3 w-3 text-muted-foreground" />
-                                <span>Adjust</span>
-                              </Button>
-
                               {/* More Options Dropdown */}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -1270,6 +1251,18 @@ export function InventoryTable({
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border border-border/80 bg-popover/95 backdrop-blur-sm p-1.5 space-y-0.5">
+                                  <DropdownMenuItem
+                                    className="gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer text-foreground/90 hover:text-foreground hover:bg-muted/70 transition-colors"
+                                    onClick={() => {
+                                      setStockAdjustItem(item);
+                                      setAdjustAction('Stock In');
+                                      setAdjustQuantity(1);
+                                      setAdjustNote('');
+                                    }}
+                                  >
+                                    <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span>Adjust Stock</span>
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer text-foreground/90 hover:text-foreground hover:bg-muted/70 transition-colors"
                                     onClick={() => {
