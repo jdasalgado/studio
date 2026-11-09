@@ -1127,7 +1127,7 @@ const DevotionForm = ({
       {/* â”€â”€ ROW 1: MENTEE & DATE â”€â”€ */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
         {/* Mentee Selection */}
-        <div className="space-y-1.5 sm:col-span-5">
+        <div className="space-y-1.5 sm:col-span-7">
           <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
             Mentee <span className="text-red-500 ml-0.5">*</span>
           </Label>
@@ -1150,7 +1150,7 @@ const DevotionForm = ({
         </div>
 
         {/* Date Selection */}
-        <div className="space-y-1.5 sm:col-span-4">
+        <div className="space-y-1.5 sm:col-span-5">
           <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
             Date <span className="text-red-500 ml-0.5">*</span>
           </Label>
@@ -1159,17 +1159,6 @@ const DevotionForm = ({
             onChange={(d) => d && setSelectedDate(d)}
             className="w-full h-10 rounded-xl border border-slate-200/90 dark:border-border text-xs bg-white dark:bg-muted/30 shadow-2xs font-medium"
             align="start"
-          />
-        </div>
-
-        {/* Time Selection */}
-        <div className="space-y-1.5 sm:col-span-3">
-          <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-            Time <span className="text-red-500 ml-0.5">*</span>
-          </Label>
-          <TimePicker
-            value={selectedTime}
-            onChange={setSelectedTime}
           />
         </div>
       </div>
