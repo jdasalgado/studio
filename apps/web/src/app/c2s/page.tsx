@@ -1370,7 +1370,7 @@ const DevotionForm = ({
               </span>
             </button>
 
-            {/* ── MOBILE ONLY ACTION MENU (Anchored directly above Add photo button - Image 2) ── */}
+            {/* ── MOBILE ONLY ACTION MENU (Pops up directly over/at the Add photo button) ── */}
             {isPhotoMenuOpen && (
               <>
                 <div
@@ -1379,7 +1379,7 @@ const DevotionForm = ({
                 />
                 <div
                   style={{ backgroundColor: "#323234" }}
-                  className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
+                  className="absolute top-0 left-0 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
                 >
                   <button
                     type="button"
@@ -1466,7 +1466,7 @@ const DevotionForm = ({
                     />
                     <div
                       style={{ backgroundColor: "#323234" }}
-                      className="absolute bottom-full left-0 mb-2 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-bottom-left duration-150 select-none"
+                      className="absolute top-0 left-0 z-50 w-56 sm:w-60 overflow-hidden rounded-[24px] bg-[#323234] text-white border border-white/20 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 origin-top-left duration-150 select-none"
                     >
                       <button
                         type="button"
