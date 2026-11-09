@@ -25,6 +25,7 @@ import {
   Check,
   Building,
   ArrowLeft,
+  FileText,
 } from "lucide-react";
 import { cn, toJsDate } from "@/lib/utils";
 import { format } from "date-fns";
@@ -281,82 +282,128 @@ export function ReservationDetailsSheet({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {booking.requestedElements && booking.requestedElements.length > 0 ? (
-                booking.requestedElements.map((elId: string) => {
-                  const el = venueElements.find((v) => v.id === elId);
+              {(() => {
+                const requestedList: string[] = Array.isArray(booking.requestedElements)
+                  ? booking.requestedElements
+                  : [];
+
+                const knownElements = requestedList
+                  .map((elId: string) => ({
+                    id: elId,
+                    el: venueElements?.find((v: any) => v.id === elId),
+                  }))
+                  .filter((item: any) => Boolean(item.el));
+
+                const customNotes = requestedList.filter(
+                  (elId: string) => !venueElements?.some((v: any) => v.id === elId)
+                );
+
+                const hasTv = Boolean(booking.equipment_TV);
+                const hasMic = Boolean(booking.equipment_Mic);
+                const hasSpeakers = Boolean(booking.equipment_Speakers);
+                const hasElements = knownElements.length > 0;
+                const hasNotes = customNotes.length > 0;
+
+                if (!hasTv && !hasMic && !hasSpeakers && !hasElements && !hasNotes) {
                   return (
-                    <div
-                      key={elId}
-                      className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/50 border-emerald-100 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-300"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-xs font-bold block truncate">
-                            {el?.name || elId}
-                          </span>
-                          {el?.category && (
-                            <span className="text-[9px] text-emerald-600/70 dark:text-emerald-400 font-semibold uppercase tracking-wider block truncate">
-                              {el.category}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
-                        Requested
-                      </span>
+                    <div className="col-span-full p-3.5 text-xs text-muted-foreground italic bg-muted/20 border border-border/40 rounded-xl text-center">
+                      No additional elements or AV equipment requested.
                     </div>
                   );
-                })
-              ) : booking.equipment_TV || booking.equipment_Mic || booking.equipment_Speakers ? (
-                <>
-                  {booking.equipment_TV && (
-                    <div className="flex items-center justify-between p-3 rounded-xl border bg-blue-50/50 border-blue-100 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/40 dark:text-blue-300">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
-                          <Tv className="h-4 w-4 text-blue-500" />
+                }
+
+                return (
+                  <>
+                    {hasTv && (
+                      <div className="flex items-center justify-between p-3 rounded-xl border bg-blue-50/50 border-blue-100 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/40 dark:text-blue-300">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
+                            <Tv className="h-4 w-4 text-blue-500" />
+                          </div>
+                          <span className="text-xs font-bold">Television / Presentation</span>
                         </div>
-                        <span className="text-xs font-bold">Television / Presentation</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">
+                          Requested
+                        </span>
                       </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">
-                        Requested
-                      </span>
-                    </div>
-                  )}
-                  {booking.equipment_Mic && (
-                    <div className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/50 border-emerald-100 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-300">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
-                          <Mic className="h-4 w-4 text-emerald-500" />
+                    )}
+
+                    {hasMic && (
+                      <div className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/50 border-emerald-100 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-300">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
+                            <Mic className="h-4 w-4 text-emerald-500" />
+                          </div>
+                          <span className="text-xs font-bold">Microphone &amp; Audio</span>
                         </div>
-                        <span className="text-xs font-bold">Microphone &amp; Audio</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                          Requested
+                        </span>
                       </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                        Requested
-                      </span>
-                    </div>
-                  )}
-                  {booking.equipment_Speakers && (
-                    <div className="flex items-center justify-between p-3 rounded-xl border bg-purple-50/50 border-purple-100 text-purple-900 dark:bg-purple-950/20 dark:border-purple-900/40 dark:text-purple-300">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
-                          <Speaker className="h-4 w-4 text-purple-500" />
+                    )}
+
+                    {hasSpeakers && (
+                      <div className="flex items-center justify-between p-3 rounded-xl border bg-purple-50/50 border-purple-100 text-purple-900 dark:bg-purple-950/20 dark:border-purple-900/40 dark:text-purple-300">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
+                            <Speaker className="h-4 w-4 text-purple-500" />
+                          </div>
+                          <span className="text-xs font-bold">Sound System / Speakers</span>
                         </div>
-                        <span className="text-xs font-bold">Sound System / Speakers</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-purple-600 dark:text-purple-400">
+                          Requested
+                        </span>
                       </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-purple-600 dark:text-purple-400">
-                        Requested
-                      </span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="col-span-full p-3.5 text-xs text-muted-foreground italic bg-muted/20 border border-border/40 rounded-xl text-center">
-                  No additional elements or AV equipment requested.
-                </div>
-              )}
+                    )}
+
+                    {knownElements.map(({ id, el }: any) => (
+                      <div
+                        key={id}
+                        className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/50 border-emerald-100 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-300"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="p-1.5 rounded-lg bg-card shadow-2xs shrink-0">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold block truncate">
+                              {el.name}
+                            </span>
+                            {el.category && (
+                              <span className="text-[9px] text-emerald-600/70 dark:text-emerald-400 font-semibold uppercase tracking-wider block truncate">
+                                {el.category}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
+                          Requested
+                        </span>
+                      </div>
+                    ))}
+
+                    {customNotes.map((note: string, idx: number) => (
+                      <div
+                        key={idx}
+                        className="col-span-full p-3.5 rounded-xl border bg-slate-50/80 border-slate-200/80 dark:bg-muted/20 dark:border-border/70 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                            <FileText className="h-4 w-4 text-primary shrink-0" />
+                            <span>Special AV &amp; Equipment Request</span>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-primary shrink-0 ml-2">
+                            Requested
+                          </span>
+                        </div>
+                        <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed pl-6">
+                          {note}
+                        </p>
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
             </div>
           </div>
 

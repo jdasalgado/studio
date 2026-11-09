@@ -29,6 +29,9 @@ import {
   RotateCcw,
   Wrench,
   AlertTriangle,
+  Tv,
+  Mic,
+  Speaker,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -82,6 +85,10 @@ export default function NewReservationPage() {
   const [numTables, setNumTables] = useState("");
   const [numChairs, setNumChairs] = useState("");
   const [requestedElements, setRequestedElements] = useState<string[]>([]);
+  const [customAvRequest, setCustomAvRequest] = useState("");
+  const [equipmentTv, setEquipmentTv] = useState(false);
+  const [equipmentMic, setEquipmentMic] = useState(false);
+  const [equipmentSpeakers, setEquipmentSpeakers] = useState(false);
   const [guidelinesAccepted, setGuidelinesAccepted] = useState(false);
 
   // Initialize Request ID and User defaults
@@ -601,10 +608,13 @@ export default function NewReservationPage() {
         pax: paxNum || 0,
         numTables: parseInt(numTables) || 0,
         numChairs: parseInt(numChairs) || 0,
-        requestedElements,
-        equipment_TV: false,
-        equipment_Mic: false,
-        equipment_Speakers: false,
+        requestedElements: [
+          ...requestedElements,
+          ...(customAvRequest.trim() ? [customAvRequest.trim()] : []),
+        ],
+        equipment_TV: equipmentTv,
+        equipment_Mic: equipmentMic,
+        equipment_Speakers: equipmentSpeakers,
         guidelinesAccepted: true,
       };
 
@@ -667,6 +677,11 @@ export default function NewReservationPage() {
             setPurpose("");
             setStartTime("");
             setEndTime("");
+            setCustomAvRequest("");
+            setEquipmentTv(false);
+            setEquipmentMic(false);
+            setEquipmentSpeakers(false);
+            setRequestedElements([]);
             setGeneratedRequestId(`REQ-${Math.floor(1000 + Math.random() * 9000)}`);
           },
         });
@@ -1258,53 +1273,143 @@ export default function NewReservationPage() {
               </div>
             </div>
 
-            {/* Optional Facility Elements */}
-            {selectedRoom &&
-              selectedRoom.elements &&
-              selectedRoom.elements.length > 0 && (
-                <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-border/60">
-                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    Requested Equipment & Facility Elements
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {selectedRoom.elements.map((elementId: string) => {
-                      const element = venueElements?.find(
-                        (e) => e.id === elementId
-                      );
-                      if (!element) return null;
-                      return (
-                        <div
-                          key={element.id}
-                          className="flex items-center space-x-2.5 bg-slate-50/80 dark:bg-muted/30 p-2.5 rounded-xl border border-slate-200/70 dark:border-border/60 hover:border-sidebar/30 transition-all"
-                        >
-                          <Checkbox
-                            id={`element-${element.id}`}
-                            checked={requestedElements.includes(element.id)}
-                            onCheckedChange={(c) => {
-                              if (c) {
-                                setRequestedElements((prev) => [
-                                  ...prev,
-                                  element.id,
-                                ]);
-                              } else {
-                                setRequestedElements((prev) =>
-                                  prev.filter((id) => id !== element.id)
-                                );
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`element-${element.id}`}
-                            className="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300 select-none"
-                          >
-                            {element.name}
-                          </label>
-                        </div>
-                      );
-                    })}
+            {/* ── REQUESTED ELEMENTS & AV (OPTIONAL) ── */}
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-border/60">
+              <div className="space-y-0.5">
+                <label className="text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                  Requested Elements &amp; AV <span className="text-[10px] font-normal text-muted-foreground lowercase">(optional)</span>
+                </label>
+                <p className="text-[11px] text-muted-foreground">
+                  Select common AV equipment or type specific equipment/setup requests for your reservation.
+                </p>
+              </div>
+
+              {/* Common AV Equipment Checkboxes */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div
+                  onClick={() => setEquipmentTv(!equipmentTv)}
+                  className={cn(
+                    "flex items-center space-x-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none",
+                    equipmentTv
+                      ? "bg-primary/5 border-primary/40 text-foreground dark:bg-primary/10 shadow-2xs"
+                      : "bg-slate-50/70 dark:bg-muted/20 border-slate-200/70 dark:border-border/60 text-muted-foreground hover:border-slate-300 dark:hover:border-border"
+                  )}
+                >
+                  <Checkbox
+                    id="equipment-tv"
+                    checked={equipmentTv}
+                    onCheckedChange={(c) => setEquipmentTv(!!c)}
+                  />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Tv className="h-4 w-4 text-blue-500 shrink-0" />
+                    <span className="text-xs font-semibold">Television / Presentation</span>
                   </div>
                 </div>
-              )}
+
+                <div
+                  onClick={() => setEquipmentMic(!equipmentMic)}
+                  className={cn(
+                    "flex items-center space-x-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none",
+                    equipmentMic
+                      ? "bg-primary/5 border-primary/40 text-foreground dark:bg-primary/10 shadow-2xs"
+                      : "bg-slate-50/70 dark:bg-muted/20 border-slate-200/70 dark:border-border/60 text-muted-foreground hover:border-slate-300 dark:hover:border-border"
+                  )}
+                >
+                  <Checkbox
+                    id="equipment-mic"
+                    checked={equipmentMic}
+                    onCheckedChange={(c) => setEquipmentMic(!!c)}
+                  />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Mic className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span className="text-xs font-semibold">Microphone &amp; Audio</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setEquipmentSpeakers(!equipmentSpeakers)}
+                  className={cn(
+                    "flex items-center space-x-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none",
+                    equipmentSpeakers
+                      ? "bg-primary/5 border-primary/40 text-foreground dark:bg-primary/10 shadow-2xs"
+                      : "bg-slate-50/70 dark:bg-muted/20 border-slate-200/70 dark:border-border/60 text-muted-foreground hover:border-slate-300 dark:hover:border-border"
+                  )}
+                >
+                  <Checkbox
+                    id="equipment-speakers"
+                    checked={equipmentSpeakers}
+                    onCheckedChange={(c) => setEquipmentSpeakers(!!c)}
+                  />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Speaker className="h-4 w-4 text-purple-500 shrink-0" />
+                    <span className="text-xs font-semibold">Sound System / Speakers</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Room Specific Facility Elements if any */}
+              {selectedRoom &&
+                selectedRoom.elements &&
+                selectedRoom.elements.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <span className="text-[11px] font-semibold text-muted-foreground">
+                      Available Room Elements:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                      {selectedRoom.elements.map((elementId: string) => {
+                        const element = venueElements?.find(
+                          (e) => e.id === elementId
+                        );
+                        if (!element) return null;
+                        return (
+                          <div
+                            key={element.id}
+                            className="flex items-center space-x-2.5 bg-slate-50/80 dark:bg-muted/30 p-2.5 rounded-xl border border-slate-200/70 dark:border-border/60 hover:border-sidebar/30 transition-all cursor-pointer"
+                          >
+                            <Checkbox
+                              id={`element-${element.id}`}
+                              checked={requestedElements.includes(element.id)}
+                              onCheckedChange={(c) => {
+                                if (c) {
+                                  setRequestedElements((prev) => [
+                                    ...prev,
+                                    element.id,
+                                  ]);
+                                } else {
+                                  setRequestedElements((prev) =>
+                                    prev.filter((id) => id !== element.id)
+                                  );
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`element-${element.id}`}
+                              className="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300 select-none"
+                            >
+                              {element.name}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+              {/* Custom Typed Request (Optional) */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Special AV &amp; Equipment Request <span className="text-muted-foreground font-normal">(Optional)</span>
+                </label>
+                <Textarea
+                  rows={2}
+                  maxLength={500}
+                  placeholder="Type any specific AV equipment, cables, adapters, or setup requests (e.g., 2 wireless microphones, HDMI cable, presenter clicker, whiteboard)..."
+                  value={customAvRequest}
+                  onChange={(e) => setCustomAvRequest(e.target.value.slice(0, 500))}
+                  className="rounded-xl border border-slate-200/90 dark:border-border text-xs bg-background dark:bg-muted/20 p-3 shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar resize-none transition-all placeholder:text-muted-foreground/60"
+                />
+              </div>
+            </div>
 
             {/* ORS Guidelines Section (Retained before Submit & Cancel buttons) */}
             <div className="bg-slate-50/90 dark:bg-muted/30 p-4 rounded-xl border border-slate-200/90 dark:border-border space-y-2.5 mt-6 shadow-2xs">
