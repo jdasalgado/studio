@@ -21,7 +21,7 @@ import {
   Speaker,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getBookingById } from "@/actions/db";
+import { getBookingById, getVenueElements } from "@/actions/db";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { ApprovalRequest, Worker } from "@studio/types";
@@ -152,6 +152,13 @@ export function ApprovalDetailsDialog({
     queryFn: () => (request?.reservationId ? getBookingById(request.reservationId) : null),
     enabled: Boolean(request?.type === "Room Booking" && request?.reservationId && !booking && open),
     staleTime: 30_000,
+  });
+
+  const { data: venueElements } = useQuery({
+    queryKey: ["venue-elements"],
+    queryFn: () => getVenueElements(),
+    enabled: Boolean(request?.type === "Room Booking" && open),
+    staleTime: 60_000,
   });
 
   const activeBooking = booking || fetchedBooking;
@@ -354,7 +361,14 @@ export function ApprovalDetailsDialog({
                   const hasTv = Boolean(activeBooking?.equipment_TV);
                   const hasMic = Boolean(activeBooking?.equipment_Mic);
                   const hasSpeakers = Boolean(activeBooking?.equipment_Speakers);
-                  const hasAnyAvOrElements = requestedList.length > 0 || hasTv || hasMic || hasSpeakers;
+
+                  // Resolve element IDs to names; anything that doesn't match an ID is treated as free-text
+                  const resolvedItems = requestedList.map((entry: string) => {
+                    const matched = venueElements?.find((e: any) => e.id === entry);
+                    return matched ? matched.name : entry;
+                  });
+
+                  const hasAnyAvOrElements = resolvedItems.length > 0 || hasTv || hasMic || hasSpeakers;
 
                   return (
                     <>
@@ -434,7 +448,7 @@ export function ApprovalDetailsDialog({
                               </div>
                             )}
 
-                            {requestedList.map((item: string, idx: number) => (
+                            {resolvedItems.map((item: string, idx: number) => (
                               <div
                                 key={idx}
                                 className="p-2.5 rounded-lg bg-background border border-border/60 text-xs font-medium text-foreground whitespace-pre-wrap leading-relaxed shadow-2xs"
