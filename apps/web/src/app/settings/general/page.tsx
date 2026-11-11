@@ -335,10 +335,10 @@ export default function GeneralSettingsPage() {
                 {isDirty ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/20">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    May mga unsaved changes
+                    Unsaved changes pending
                   </span>
                 ) : (
-                  <span className="text-muted-foreground/80">Lahat ng settings ay saved</span>
+                  <span className="text-muted-foreground/80">All settings saved</span>
                 )}
               </div>
               <div className="flex items-center gap-2.5 self-end sm:self-auto">
@@ -380,7 +380,7 @@ export default function GeneralSettingsPage() {
               Discard Unsaved Changes?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
-              Mayroon kang mga binagong settings na hindi pa nai-save. Sigurado ka bang nais mong kanselahin o i-discard ang mga binago mo?
+              You have unsaved changes. Are you sure you want to discard your modifications?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-2">
@@ -397,7 +397,7 @@ export default function GeneralSettingsPage() {
                 setShowDiscardDialog(false);
                 toast({
                   title: "Settings Reverted",
-                  description: "Ibinalik ang lahat ng fields sa dating saved values.",
+                  description: "All fields have been reverted to saved values.",
                 });
               }}
               className="h-9 px-3.5 rounded-xl border border-border/70 text-xs font-semibold text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
@@ -410,7 +410,7 @@ export default function GeneralSettingsPage() {
                 setShowDiscardDialog(false);
                 toast({
                   title: "Changes Discarded",
-                  description: "Na-discard ang mga binago at bumalik sa settings menu.",
+                  description: "Changes discarded.",
                 });
                 router.push("/settings");
               }}

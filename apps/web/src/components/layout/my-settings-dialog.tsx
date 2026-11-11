@@ -18,6 +18,7 @@ import {
   HelpCircle,
   AlertCircle,
   Shield,
+  LoaderCircle,
 } from "lucide-react";
 import { useAuthStore } from "@studio/store";
 import { supabase } from "@studio/database";
@@ -25,6 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { isValidEmail } from "@/lib/validation";
 import { requestPasswordReset } from "@/actions/auth";
 import { DeleteConfirmationDialog } from "@/components/common/delete-confirmation-dialog";
+import { useUserRole } from "@/hooks/use-user-role";
+import { submitProblemReport } from "@/actions/db";
 
 interface MySettingsDialogProps {
   open: boolean;
@@ -34,6 +37,8 @@ interface MySettingsDialogProps {
 export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) {
   const { toast } = useToast();
   const { user } = useAuthStore();
+  const { workerProfile, isSuperAdmin, canManageWorkers, canManageRoles } = useUserRole();
+  const isAdmin = isSuperAdmin || canManageWorkers || canManageRoles;
   
   const [activeTab, setActiveTab] = useState("password");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -41,6 +46,7 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
   const [issueTitle, setIssueTitle] = useState("");
   const [issueDescription, setIssueDescription] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   const handleChangePassword = async () => {
     if (!user?.email) return;
@@ -130,17 +136,19 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
               <Shield className="h-4 w-4" />
               <span>Login Security</span>
             </button>
-            <button
-              onClick={() => setActiveTab("support")}
-              className={`flex items-center gap-3 px-4 py-3 text-left text-sm font-bold rounded-xl transition-all cursor-pointer ${
-                activeTab === "support"
-                  ? "bg-sidebar text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-foreground hover:bg-white/50 dark:hover:bg-muted/50"
-              }`}
-            >
-              <HelpCircle className="h-4 w-4" />
-              <span>Help & Support</span>
-            </button>
+            {!isAdmin && (
+              <button
+                onClick={() => setActiveTab("support")}
+                className={`flex items-center gap-3 px-4 py-3 text-left text-sm font-bold rounded-xl transition-all cursor-pointer ${
+                  activeTab === "support"
+                    ? "bg-sidebar text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-foreground hover:bg-white/50 dark:hover:bg-muted/50"
+                }`}
+              >
+                <HelpCircle className="h-4 w-4" />
+                <span>Help & Support</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab("report")}
               className={`flex items-center gap-3 px-4 py-3 text-left text-sm font-bold rounded-xl transition-all cursor-pointer ${
@@ -150,7 +158,7 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
               }`}
             >
               <AlertCircle className="h-4 w-4" />
-              <span>Report Problem</span>
+              <span>{isAdmin ? "Helpdesk Reports" : "Report Problem"}</span>
             </button>
           </div>
 
@@ -270,7 +278,7 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
               </div>
             )}
 
-            {activeTab === "support" && (
+            {activeTab === "support" && !isAdmin && (
               <div className="space-y-5 max-w-2xl">
                 {/* Section Header */}
                 <div className="space-y-2">
@@ -335,6 +343,38 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
             )}
 
             {activeTab === "report" && (
+              isAdmin ? (
+                <div className="space-y-5 max-w-2xl">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sidebar/10 text-sidebar dark:text-blue-400 text-xs font-bold border border-sidebar/20">
+                      <Shield className="w-3.5 h-3.5" />
+                      <span>IT Administration Helpdesk</span>
+                    </div>
+                    <h3 className="text-xl font-bold font-headline text-foreground">Worker Problem Reports</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      As an administrator, technical problem reports and tickets submitted by church workers and ministry heads are routed directly to you.
+                    </p>
+                  </div>
+
+                  <div className="bg-card rounded-2xl border border-border/60 p-6 shadow-sm space-y-4">
+                    <p className="text-sm text-foreground/90 leading-relaxed">
+                      You are an administrator and do not need to submit problem reports from here. All incoming tickets submitted by workers and ministry heads are collected and manageable in real-time.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <Button
+                        onClick={() => {
+                          onOpenChange(false);
+                          window.location.href = "/my-settings?tab=report";
+                        }}
+                        className="bg-sidebar hover:bg-sidebar/90 text-white font-semibold text-xs h-11 rounded-xl shadow-xs cursor-pointer"
+                      >
+                        Open Helpdesk Reports
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <div className="space-y-5 max-w-2xl">
                 {/* Section Header */}
                 <div className="space-y-2">
@@ -382,7 +422,8 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
                     />
                   </div>
                   <Button
-                    onClick={() => {
+                    disabled={isSubmittingReport}
+                    onClick={async () => {
                       if (!issueTitle.trim() || !issueDescription.trim()) {
                         toast({
                           variant: "destructive",
@@ -399,18 +440,50 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
                         });
                         return;
                       }
-                      toast({
-                        title: "Report Submitted",
-                        description: "Thank you for your feedback. We'll look into this issue promptly.",
-                      });
-                      setIssueTitle("");
-                      setIssueDescription("");
-                      setContactEmail("");
-                      onOpenChange(false);
+
+                      setIsSubmittingReport(true);
+                      try {
+                        const reporterName = workerProfile
+                          ? [workerProfile.firstName, workerProfile.lastName].filter(Boolean).join(" ")
+                          : (user?.user_metadata?.full_name as string) || user?.email || "Staff / Worker";
+
+                        const result = await submitProblemReport({
+                          category: "general",
+                          subject: issueTitle.trim(),
+                          description: issueDescription.trim(),
+                          contactEmail: contactEmail.trim() || user?.email || null,
+                          reporterName,
+                          workerId: workerProfile?.id || user?.id || null,
+                        });
+
+                        toast({
+                          title: "Problem Report Submitted",
+                          description: `Your ticket (${result.ticketRef}) has been sent to IT support.`,
+                        });
+                        setIssueTitle("");
+                        setIssueDescription("");
+                        setContactEmail("");
+                        onOpenChange(false);
+                      } catch (err: any) {
+                        toast({
+                          variant: "destructive",
+                          title: "Submission Failed",
+                          description: err?.message || "Could not submit report. Please try again.",
+                        });
+                      } finally {
+                        setIsSubmittingReport(false);
+                      }
                     }}
-                    className="w-full text-sm font-semibold h-11 rounded-xl bg-sidebar hover:bg-sidebar/90 text-white shadow-xs"
+                    className="w-full text-sm font-semibold h-11 rounded-xl bg-sidebar hover:bg-sidebar/90 text-white shadow-xs cursor-pointer"
                   >
-                    Submit Report
+                    {isSubmittingReport ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        <span>Submitting Ticket...</span>
+                      </span>
+                    ) : (
+                      "Submit Report"
+                    )}
                   </Button>
                 </div>
 
@@ -421,6 +494,7 @@ export function MySettingsDialog({ open, onOpenChange }: MySettingsDialogProps) 
                   </p>
                 </div>
               </div>
+              )
             )}
           </div>
         </div>

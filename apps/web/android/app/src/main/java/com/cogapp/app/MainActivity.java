@@ -1,18 +1,28 @@
 package com.cogapp.app;
 
 import android.Manifest;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.provider.Settings;
+import android.util.Base64;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 
 public class MainActivity extends BridgeActivity {
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
@@ -38,6 +48,101 @@ public class MainActivity extends BridgeActivity {
                             CAMERA_PERMISSION_REQUEST_CODE);
                 }
             } catch (Exception ignored) {
+            }
+        }
+
+        /**
+         * Saves a base64 encoded file directly to the device's public storage.
+         * Images (PNG, JPG, etc.) -> Pictures/COG
+         * Documents (Excel, CSV, PDF, etc.) -> Download
+         */
+        @JavascriptInterface
+        public boolean saveBase64File(String base64Data, String fileName, String mimeType) {
+            try {
+                if (base64Data == null || fileName == null) {
+                    return false;
+                }
+
+                // Strip data URL scheme prefix if present (e.g. data:image/png;base64,...)
+                String cleanBase64 = base64Data;
+                int commaIdx = cleanBase64.indexOf(",");
+                if (commaIdx != -1) {
+                    cleanBase64 = cleanBase64.substring(commaIdx + 1);
+                }
+                cleanBase64 = cleanBase64.replaceAll("\\s+", "");
+
+                byte[] fileBytes = Base64.decode(cleanBase64, Base64.DEFAULT);
+                if (fileBytes == null || fileBytes.length == 0) {
+                    return false;
+                }
+
+                boolean isImage = (mimeType != null && mimeType.startsWith("image/"))
+                        || fileName.endsWith(".png")
+                        || fileName.endsWith(".jpg")
+                        || fileName.endsWith(".jpeg");
+
+                boolean success = false;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // Android 10+ (API 29+) MediaStore scoped storage
+                    ContentResolver resolver = getContentResolver();
+                    ContentValues contentValues = new ContentValues();
+                    contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+                    contentValues.put(MediaStore.MediaColumns.MIME_TYPE, mimeType != null ? mimeType : (isImage ? "image/png" : "application/octet-stream"));
+
+                    Uri collectionUri;
+                    if (isImage) {
+                        contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/COG");
+                        collectionUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                    } else {
+                        contentValues.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                        collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+                    }
+
+                    Uri fileUri = resolver.insert(collectionUri, contentValues);
+                    if (fileUri != null) {
+                        try (OutputStream outputStream = resolver.openOutputStream(fileUri)) {
+                            if (outputStream != null) {
+                                outputStream.write(fileBytes);
+                                outputStream.flush();
+                                success = true;
+                            }
+                        }
+                    }
+                } else {
+                    // Legacy Android 9 and below
+                    File targetDir = isImage
+                            ? new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "COG")
+                            : Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+
+                    if (!targetDir.exists()) {
+                        targetDir.mkdirs();
+                    }
+
+                    File file = new File(targetDir, fileName);
+                    try (FileOutputStream fos = new FileOutputStream(file)) {
+                        fos.write(fileBytes);
+                        fos.flush();
+                        success = true;
+                    }
+
+                    // Scan file so it shows in Gallery / Downloads app
+                    Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                    mediaScanIntent.setData(Uri.fromFile(file));
+                    sendBroadcast(mediaScanIntent);
+                }
+
+                final boolean finalSuccess = success;
+                final String finalMsg = success
+                        ? (isImage ? "Saved to Pictures/COG (" + fileName + ")" : "Saved to Downloads (" + fileName + ")")
+                        : "Failed to save file";
+
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, finalMsg, Toast.LENGTH_LONG).show());
+                return finalSuccess;
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Error saving file: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                return false;
             }
         }
     }

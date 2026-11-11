@@ -230,6 +230,7 @@ export function Nav({
 }) {
   const userRole = useUserRole();
   const { isLoading, needsSeeding, workerProfile, isSuperAdmin, isMinistryHead } = userRole;
+  const isAdmin = isSuperAdmin || userRole.canManageWorkers || userRole.canManageRoles;
   const searchParams = useSearchParams();
   const { scale } = useFontSize();
   const mainFontSize = `${16 * scale}px`;
@@ -594,8 +595,8 @@ export function Nav({
                       { href: "/my-settings?tab=appearance", label: "Display & Font Size" },
                       { href: "/my-settings?tab=password", label: "Change Password" },
                       { href: "/my-settings?tab=security", label: "Login Security" },
-                      { href: "/my-settings?tab=support", label: "Help & Support" },
-                      { href: "/my-settings?tab=report", label: "Report a Problem" },
+                      ...(!isAdmin ? [{ href: "/my-settings?tab=support", label: "Help & Support" }] : []),
+                      { href: "/my-settings?tab=report", label: isAdmin ? "Helpdesk Reports" : "Report a Problem" },
                     ].map((subItem) => (
                       <DropdownMenuItem
                         key={subItem.href}
@@ -638,8 +639,8 @@ export function Nav({
                         { href: "/my-settings?tab=appearance", label: "Display & Font Size" },
                         { href: "/my-settings?tab=password", label: "Change Password" },
                         { href: "/my-settings?tab=security", label: "Login Security" },
-                        { href: "/my-settings?tab=support", label: "Help & Support" },
-                        { href: "/my-settings?tab=report", label: "Report a Problem" },
+                        ...(!isAdmin ? [{ href: "/my-settings?tab=support", label: "Help & Support" }] : []),
+                        { href: "/my-settings?tab=report", label: isAdmin ? "Helpdesk Reports" : "Report a Problem" },
                       ].map((subItem) => (
                         <SidebarMenuSubItem key={subItem.href}>
                           <SidebarMenuSubButton

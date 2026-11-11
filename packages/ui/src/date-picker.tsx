@@ -149,7 +149,7 @@ export function DatePicker({
         <button
           type="button"
           className={cn(
-            "group flex items-center justify-start gap-2 px-3 h-10 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-border rounded-2xl bg-background dark:bg-muted/30 shadow-2xs w-[130px] sm:w-36 text-left hover:border-sidebar/50 dark:hover:border-blue-400/50 focus:outline-hidden focus:ring-1 focus:ring-sidebar/40 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+            "group flex items-center justify-start gap-2 px-3 h-10 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-border rounded-2xl bg-background dark:bg-muted/30 shadow-2xs w-full text-left hover:border-sidebar/50 dark:hover:border-blue-400/50 focus:outline-hidden focus:ring-1 focus:ring-sidebar/40 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
             className
           )}
         >

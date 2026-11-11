@@ -16,6 +16,14 @@ import {
   SelectLabel,
   Checkbox,
   DatePicker,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@studio/ui";
 import {
   Calendar as CalendarIcon,
@@ -84,8 +92,8 @@ export default function NewReservationPage() {
   const [numTables, setNumTables] = useState("");
   const [numChairs, setNumChairs] = useState("");
   const [requestedElements, setRequestedElements] = useState<string[]>([]);
-  const [customAvRequest, setCustomAvRequest] = useState("");
   const [guidelinesAccepted, setGuidelinesAccepted] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   // Initialize Request ID and User defaults
   useEffect(() => {
@@ -554,6 +562,36 @@ export default function NewReservationPage() {
       return;
     }
 
+    const [startH, startM] = startTime.split(":").map(Number);
+    const [endH, endM] = endTime.split(":").map(Number);
+
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const start = new Date(y, m - 1, d, startH, startM, 0, 0);
+    const end = new Date(y, m - 1, d, endH, endM, 0, 0);
+
+    if (start <= new Date()) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Start Time",
+        description: "The reservation start time has already passed. Please select a future time slot.",
+      });
+      return;
+    }
+
+    if (start >= end) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Time",
+        description: "End time must be after start time.",
+      });
+      return;
+    }
+
+    setIsConfirmDialogOpen(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setIsConfirmDialogOpen(false);
     setIsSubmitting(true);
 
     try {
@@ -565,25 +603,13 @@ export default function NewReservationPage() {
       const start = new Date(y, m - 1, d, startH, startM, 0, 0);
       const end = new Date(y, m - 1, d, endH, endM, 0, 0);
 
-      if (start <= new Date()) {
-        toast({
-          variant: "destructive",
-          title: "Invalid Start Time",
-          description: "The reservation start time has already passed. Please select a future time slot.",
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (start >= end) {
-        toast({
-          variant: "destructive",
-          title: "Invalid Time",
-          description: "End time must be after start time.",
-        });
-        setIsSubmitting(false);
-        return;
-      }
+      const effectiveMinistryId =
+        (isAdminUser ? (generalMinistry?.id || "A-GENERAL") : "") ||
+        ministryId ||
+        userMinistry?.id ||
+        workerProfile?.majorMinistryId ||
+        (myMinistryIds && myMinistryIds[0]) ||
+        (generalMinistry?.id || "A-GENERAL");
 
       const effectiveWorkerId =
         workerProfile?.id || "worker-system-admin";
@@ -606,12 +632,11 @@ export default function NewReservationPage() {
         name: requesterName || "System Admin",
         ministryId: effectiveMinistryId,
         email: email || "admin@gmail.com",
-        pax: paxNum || 0,
+        pax: parseInt(pax) || 0,
         numTables: parseInt(numTables) || 0,
         numChairs: parseInt(numChairs) || 0,
         requestedElements: [
           ...requestedElements,
-          ...(customAvRequest.trim() ? [customAvRequest.trim()] : []),
         ],
         equipment_TV: false,
         equipment_Mic: false,
@@ -678,7 +703,6 @@ export default function NewReservationPage() {
             setPurpose("");
             setStartTime("");
             setEndTime("");
-            setCustomAvRequest("");
             setRequestedElements([]);
             setGeneratedRequestId(`REQ-${Math.floor(1000 + Math.random() * 9000)}`);
           },
@@ -896,14 +920,12 @@ export default function NewReservationPage() {
                 </label>
                 <Input
                   required
+                  disabled
                   maxLength={MAX_LENGTHS.NAME}
                   value={requesterName}
-                  onChange={(e) => setRequesterName(cleanName(e.target.value, MAX_LENGTHS.NAME))}
                   placeholder="System Admin"
-                  className="bg-background dark:bg-muted/30 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 border border-slate-200/90 dark:border-border rounded-xl h-10 text-xs font-normal shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
+                  className="bg-slate-50/90 dark:bg-muted/30 border border-slate-200/80 dark:border-border text-slate-600 dark:text-slate-300 rounded-xl h-10 text-xs font-normal cursor-not-allowed shadow-2xs"
                 />
-                <div className="flex justify-end">
-                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -1240,9 +1262,11 @@ export default function NewReservationPage() {
                   max={5}
                   className="bg-background dark:bg-muted/30 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 border border-slate-200/90 dark:border-border rounded-xl h-10 text-xs font-normal shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                 />
-                <p className="text-xs font-medium text-muted-foreground mt-1">
-                  Maximum: 5 tables
-                </p>
+                {selectedRoom && (
+                  <p className="text-xs font-medium text-muted-foreground mt-1">
+                    Maximum: 5 tables
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -1265,9 +1289,11 @@ export default function NewReservationPage() {
                   max={selectedRoom?.capacity || 60}
                   className="bg-background dark:bg-muted/30 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 border border-slate-200/90 dark:border-border rounded-xl h-10 text-xs font-normal shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                 />
-                <p className="text-xs font-medium text-muted-foreground mt-1">
-                  Maximum: {selectedRoom?.capacity ? `${selectedRoom.capacity} chairs` : "60 chairs"}
-                </p>
+                {selectedRoom && (
+                  <p className="text-xs font-medium text-muted-foreground mt-1">
+                    Maximum: {selectedRoom.capacity ? `${selectedRoom.capacity} chairs` : "60 chairs"}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1321,21 +1347,6 @@ export default function NewReservationPage() {
                     </div>
                   </div>
                 )}
-
-              {/* Custom Typed Request & AV (Optional) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                  Request &amp; AV <span className="text-muted-foreground font-normal">(Optional)</span>
-                </label>
-                <Textarea
-                  rows={2}
-                  maxLength={500}
-                  placeholder="Type any specific AV equipment, cables, adapters, or setup requests (e.g., 2 wireless microphones, HDMI cable, presenter clicker, whiteboard)..."
-                  value={customAvRequest}
-                  onChange={(e) => setCustomAvRequest(e.target.value.slice(0, 500))}
-                  className="rounded-xl border border-slate-200/90 dark:border-border text-xs bg-background dark:bg-muted/20 p-3 shadow-2xs focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar resize-none transition-all placeholder:text-muted-foreground/60"
-                />
-              </div>
             </div>
 
             {/* ORS Guidelines Section (Retained before Submit & Cancel buttons) */}
@@ -1394,6 +1405,67 @@ export default function NewReservationPage() {
           </form>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-md p-6">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base font-bold text-gray-900 dark:text-gray-100">
+              Confirm Reservation Request
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
+              Are you sure you want to submit this room reservation request? Please review your details before confirming.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="my-2 p-3.5 rounded-xl bg-slate-50 dark:bg-muted/40 border border-slate-200/80 dark:border-border/60 text-xs space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Room:</span>
+              <span className="font-semibold text-foreground">{selectedRoom?.name || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Date:</span>
+              <span className="font-semibold text-foreground">{selectedDate}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Time:</span>
+              <span className="font-semibold text-foreground">
+                {startTime} - {endTime}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Pax:</span>
+              <span className="font-semibold text-foreground">{pax || 0} people</span>
+            </div>
+          </div>
+
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel
+              disabled={isSubmitting}
+              className="rounded-xl h-9 text-xs font-semibold cursor-pointer border-slate-200/90 dark:border-border"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmSubmit();
+              }}
+              disabled={isSubmitting}
+              className="rounded-xl h-9 text-xs font-bold bg-sidebar hover:bg-sidebar/90 text-white cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  Submitting...
+                </>
+              ) : (
+                "Yes, Submit Request"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

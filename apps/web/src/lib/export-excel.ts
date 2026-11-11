@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { saveFileUniversal } from "./save-file-native";
 
 export interface ExcelSheetData {
   name: string;
@@ -105,5 +106,13 @@ export function exportToExcel(
   });
 
   const finalName = filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`;
-  XLSX.writeFile(workbook, finalName);
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([excelBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  saveFileUniversal(
+    blob,
+    finalName,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
 }

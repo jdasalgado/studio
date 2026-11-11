@@ -132,6 +132,7 @@ import {
   Legend,
 } from "recharts";
 import * as XLSX from "xlsx";
+import { saveFileUniversal } from "@/lib/save-file-native";
 import { useAuthStore, usePermissionsStore } from "@studio/store";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { C2SGroup, C2SMentee, C2SDevotionRecord, Worker } from "@studio/types";
@@ -3240,7 +3241,7 @@ const C2SAnalytics = ({
   const { toast } = useToast();
   const [showExportConfirm, setShowExportConfirm] = useState(false);
 
-  const handleExportAnalytics = () => {
+  const handleExportAnalytics = async () => {
     try {
       const totalMentees = filteredMentees.length || 0;
       const totalDevCount = filteredDevotions.length || 0;
@@ -3377,7 +3378,16 @@ const C2SAnalytics = ({
       XLSX.utils.book_append_sheet(workbook, menteesSheet, "Mentees List");
 
       const filenameCluster = selectedCluster === "all" ? "All" : selectedCluster.replace(/[^a-zA-Z0-9]/g, "_");
-      XLSX.writeFile(workbook, `C2S_Analytics_${filenameCluster}_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
+      const filename = `C2S_Analytics_${filenameCluster}_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
+      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      await saveFileUniversal(
+        blob,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
 
       toast({
         title: "Analytics Exported",

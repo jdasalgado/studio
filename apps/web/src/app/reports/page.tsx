@@ -31,16 +31,14 @@ import {
 } from "recharts";
 import { exportToExcel } from "@/lib/export-excel";
 import { ExportConfirmDialog } from "@/components/common/export-confirm-dialog";
+import { saveFileUniversal } from "@/lib/save-file-native";
 import { useToast } from "@/hooks/use-toast";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function exportCsv(filename: string, headers: string[], rows: (string | number)[][]) {
   const csvContent = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  saveFileUniversal(blob, filename, "text/csv");
 }
 
 function WorkerInitials({ name }: { name: string }) {

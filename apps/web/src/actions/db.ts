@@ -2578,7 +2578,7 @@ export async function createAttendanceRecord(data: { workerProfileId: string; ty
             const h = shiftEndHour % 12 || 12;
             const ampm = shiftEndHour >= 12 ? 'PM' : 'AM';
             const m = String(shiftEndMin).padStart(2, '0');
-            throw new Error(`Hindi na maaaring mag-time in dahil lagpas na sa working hours (${h}:${m} ${ampm}).`);
+            throw new Error(`Cannot clock in because it is past working hours (${h}:${m} ${ampm}).`);
         }
     }
 
@@ -4006,10 +4006,18 @@ export async function createInquiry(data: {
     }
 }
 
-export async function getInquiries() {
+export async function getInquiries(options?: { excludeProblemReports?: boolean }) {
+    const excludeReports = options?.excludeProblemReports ?? true;
     try {
         if ((prisma as any).inquiry) {
             const list = await (prisma as any).inquiry.findMany({
+                where: excludeReports ? {
+                    NOT: {
+                        type: {
+                            startsWith: 'Problem Report',
+                        },
+                    },
+                } : undefined,
                 orderBy: { createdAt: 'desc' },
             });
             return list;
@@ -4020,14 +4028,48 @@ export async function getInquiries() {
 
     try {
         const supabase = getSupabaseAdminClient();
-        const { data, error } = await (supabase.from('inquiries') as any)
-            .select('*')
-            .order('createdAt', { ascending: false });
+        let query = (supabase.from('inquiries') as any).select('*');
+        if (excludeReports) {
+            query = query.not('type', 'ilike', 'Problem Report%');
+        }
+        const { data, error } = await query.order('createdAt', { ascending: false });
 
         if (error) throw error;
         return data || [];
     } catch (supabaseErr) {
         console.error('Supabase get inquiries fallback error:', supabaseErr);
+        return [];
+    }
+}
+
+export async function getProblemReports() {
+    try {
+        if ((prisma as any).inquiry) {
+            const list = await (prisma as any).inquiry.findMany({
+                where: {
+                    type: {
+                        startsWith: 'Problem Report',
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+            });
+            return list;
+        }
+    } catch (err) {
+        console.warn('Prisma getProblemReports error, falling back to Supabase client:', err);
+    }
+
+    try {
+        const supabase = getSupabaseAdminClient();
+        const { data, error } = await (supabase.from('inquiries') as any)
+            .select('*')
+            .ilike('type', 'Problem Report%')
+            .order('createdAt', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    } catch (supabaseErr) {
+        console.error('Supabase get problem reports fallback error:', supabaseErr);
         return [];
     }
 }
@@ -4123,4 +4165,181 @@ export async function archiveInquiry(id: string) {
 export async function unarchiveInquiry(id: string) {
     if (!id) throw new Error('Inquiry ID is required');
     return await updateInquiryStatus(id, 'Pending');
+}
+
+export async function submitProblemReport(data: {
+    category: string;
+    subject: string;
+    description: string;
+    contactEmail?: string | null;
+    reporterName?: string | null;
+    workerId?: string | null;
+}) {
+    const categoryKey = data.category?.trim() || 'general';
+    const subject = data.subject?.trim();
+    const description = data.description?.trim();
+    const contactEmail = data.contactEmail?.trim() || null;
+    const reporterName = data.reporterName?.trim() || 'Staff / Worker';
+
+    if (!subject || !description) {
+        throw new Error('Subject and description are required.');
+    }
+
+    const categoryLabels: Record<string, string> = {
+        general: 'General System',
+        reservations: 'Room Reservations',
+        meals: 'Meal Stubs',
+        attendance: 'Attendance Log',
+        account: 'Account / Access',
+    };
+    const categoryLabel = categoryLabels[categoryKey] || categoryKey || 'General System';
+    const type = `Problem Report: ${categoryLabel}`;
+    const formattedMessage = `[Subject: ${subject}]\n\n${description}`;
+
+    let createdRecord: any = null;
+
+    // 1. Save to Database (Prisma Inquiry model, fallback to Supabase Admin)
+    try {
+        if ((prisma as any).inquiry) {
+            createdRecord = await (prisma as any).inquiry.create({
+                data: {
+                    name: reporterName,
+                    email: contactEmail || 'no-reply@cogdasma.com',
+                    phone: null,
+                    message: formattedMessage,
+                    type,
+                    status: 'Pending',
+                },
+            });
+        }
+    } catch (prismaErr) {
+        console.warn('Prisma submitProblemReport error, trying Supabase fallback:', prismaErr);
+    }
+
+    if (!createdRecord) {
+        try {
+            const supabase = getSupabaseAdminClient();
+            const { data: inserted, error } = await (supabase.from('inquiries') as any)
+                .insert({
+                    name: reporterName,
+                    email: contactEmail || 'no-reply@cogdasma.com',
+                    phone: null,
+                    message: formattedMessage,
+                    type,
+                    status: 'Pending',
+                })
+                .select('*')
+                .single();
+
+            if (error) {
+                console.error('Supabase submitProblemReport error:', error);
+                throw error;
+            }
+            createdRecord = inserted;
+        } catch (supabaseErr) {
+            console.error('Supabase fallback failed in submitProblemReport:', supabaseErr);
+            throw supabaseErr;
+        }
+    }
+
+    try { revalidatePath('/my-settings'); } catch {}
+
+    // 2. Dispatch Email Notifications asynchronously (non-blocking so report submission is instantaneous)
+    const itAdminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || process.env.SMTP_USER || 'churchofgoddasmamain@gmail.com';
+    const ticketRef = createdRecord?.id ? `TICKET-${String(createdRecord.id).slice(0, 6).toUpperCase()}` : 'NEW-TICKET';
+
+    void (async () => {
+        // A. Send notification to IT Admin / Church Email
+        try {
+            await EmailService.sendEmail({
+                to: itAdminEmail,
+                subject: `[IT Helpdesk] ${categoryLabel}: ${subject} (${ticketRef})`,
+                html: `
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                        <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); padding: 20px; border-radius: 12px; color: #ffffff; margin-bottom: 24px;">
+                            <span style="background-color: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">New IT Problem Ticket</span>
+                            <h2 style="margin: 10px 0 4px 0; font-size: 20px; font-weight: bold; color: #ffffff;">${subject}</h2>
+                            <p style="margin: 0; font-size: 13px; opacity: 0.9;">Ticket Ref: <strong>${ticketRef}</strong> &bull; Category: <strong>${categoryLabel}</strong></p>
+                        </div>
+
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b; width: 140px;">Reporter:</td>
+                                <td style="padding: 8px 0; font-weight: 600; color: #0f172a;">${reporterName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b;">Contact Email:</td>
+                                <td style="padding: 8px 0; font-weight: 600; color: #0f172a;">${contactEmail || 'Not provided'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b;">Category:</td>
+                                <td style="padding: 8px 0; font-weight: 600; color: #0f172a;">${categoryLabel}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b;">Submitted At:</td>
+                                <td style="padding: 8px 0; font-weight: 600; color: #0f172a;">${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</td>
+                            </tr>
+                        </table>
+
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                            <h4 style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Detailed Explanation</h4>
+                            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #334155; white-space: pre-wrap;">${description}</p>
+                        </div>
+
+                        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
+                            Church of God Dasmariñas &bull; IT Helpdesk Workforce
+                        </p>
+                    </div>
+                `,
+                text: `New Problem Ticket [${ticketRef}]: ${subject}\nCategory: ${categoryLabel}\nReporter: ${reporterName} (${contactEmail || 'No email'})\n\nExplanation:\n${description}`,
+            });
+        } catch (emailErr) {
+            console.error('[submitProblemReport] Failed to send IT admin notification email:', emailErr);
+        }
+
+        // B. Send confirmation receipt to reporter if contactEmail provided
+        if (contactEmail && contactEmail.includes('@')) {
+            try {
+                await EmailService.sendEmail({
+                    to: contactEmail,
+                    subject: `[COG IT Support] Problem Report Received: ${subject} (${ticketRef})`,
+                    html: `
+                        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                            <div style="padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+                                <h2 style="margin: 0; color: #1e3a8a; font-size: 20px;">Support Ticket Received</h2>
+                                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 14px;">Ticket Reference: <strong>${ticketRef}</strong></p>
+                            </div>
+                            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+                                Hello ${reporterName},<br/><br/>
+                                Thank you for reaching out to IT support. We have received your problem report regarding <strong>${categoryLabel}</strong>.
+                            </p>
+                            <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin: 20px 0;">
+                                <h4 style="margin: 0 0 6px 0; font-size: 13px; color: #1e40af; font-weight: bold;">Support SLA Guarantee</h4>
+                                <p style="margin: 0; font-size: 13px; color: #1e3a8a; line-height: 1.5;">
+                                    Your ticket is automatically triaged and assigned to our IT administration workforce. Standard response time is within <strong>24 to 48 hours</strong> on operating days.
+                                </p>
+                            </div>
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 20px;">
+                                <p style="margin: 0; font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase;">Your Submitted Issue:</p>
+                                <p style="margin: 6px 0 4px 0; font-size: 14px; font-weight: 600; color: #0f172a;">${subject}</p>
+                                <p style="margin: 0; font-size: 13px; color: #475569; white-space: pre-wrap;">${description}</p>
+                            </div>
+                            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
+                                Church of God Dasmariñas Management System &bull; IT Support
+                            </p>
+                        </div>
+                    `,
+                    text: `Hello ${reporterName},\n\nWe have received your problem report [${ticketRef}]: ${subject}.\nOur IT team typically responds within 24-48 hours.\n\nThank you,\nChurch of God Dasmariñas IT Support`,
+                });
+            } catch (receiptErr) {
+                console.error('[submitProblemReport] Failed to send user confirmation email:', receiptErr);
+            }
+        }
+    })();
+
+    return {
+        success: true,
+        ticketRef,
+        inquiry: createdRecord,
+    };
 }

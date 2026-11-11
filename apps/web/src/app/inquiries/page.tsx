@@ -103,6 +103,16 @@ function parseDateSafe(val: any): Date {
   return isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
+function getGmailComposeUrl(email: string, subject?: string, body?: string): string {
+  const params = new URLSearchParams();
+  params.set("view", "cm");
+  params.set("fs", "1");
+  if (email) params.set("to", email.trim());
+  if (subject) params.set("su", subject.trim());
+  if (body) params.set("body", body.trim());
+  return `https://mail.google.com/mail/?${params.toString()}`;
+}
+
 export default function InquiriesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -122,17 +132,22 @@ export default function InquiriesPage() {
 
   // Fetch inquiries
   const {
-    data: inquiries = [],
+    data: rawInquiries = [],
     isLoading,
     isFetching,
     refetch,
   } = useQuery({
     queryKey: ["inquiries"],
     queryFn: async () => {
-      const data = await getInquiries();
+      const data = await getInquiries({ excludeProblemReports: true });
       return (data || []) as Inquiry[];
     },
   });
+
+  // Guarantee that internal worker problem reports never appear in public inquiries
+  const inquiries = useMemo(() => {
+    return rawInquiries.filter((item) => !item.type?.startsWith("Problem Report"));
+  }, [rawInquiries]);
 
   // Helper: Determine if an inquiry is archived (either manually archived or > 30 days old)
   const isItemArchived = (item: Inquiry) => {
@@ -499,15 +514,17 @@ export default function InquiriesPage() {
                                   className="cursor-pointer gap-2 rounded-lg text-xs font-medium py-2 text-foreground"
                                 >
                                   <a
-                                    href={`mailto:${inquiry.email}?subject=Re: Church of God Dasmariñas - Your Message&body=Dear ${encodeURIComponent(
-                                      inquiry.name
-                                    )},%0D%0A%0D%0AThank you for contacting Church of God Dasmariñas regarding your message:%0D%0A"${encodeURIComponent(
-                                      inquiry.message
-                                    )}"%0D%0A%0D%0A`}
+                                    href={getGmailComposeUrl(
+                                      inquiry.email,
+                                      `Re: Church of God Dasmariñas - Your Message`,
+                                      `Dear ${inquiry.name},\n\nThank you for contacting Church of God Dasmariñas regarding your message:\n"${inquiry.message}"\n\n`
+                                    )}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="flex items-center gap-2 w-full text-foreground"
                                   >
                                     <Mail className="w-4 h-4 text-violet-500" />
-                                    <span>Reply via Email</span>
+                                    <span>Reply via Gmail</span>
                                   </a>
                                 </DropdownMenuItem>
 
@@ -728,15 +745,17 @@ export default function InquiriesPage() {
                                       className="cursor-pointer gap-2 rounded-lg text-xs font-medium py-2 text-foreground"
                                     >
                                       <a
-                                        href={`mailto:${inquiry.email}?subject=Re: Church of God Dasmariñas - Your Message&body=Dear ${encodeURIComponent(
-                                          inquiry.name
-                                        )},%0D%0A%0D%0AThank you for contacting Church of God Dasmariñas regarding your message:%0D%0A"${encodeURIComponent(
-                                          inquiry.message
-                                        )}"%0D%0A%0D%0A`}
+                                        href={getGmailComposeUrl(
+                                          inquiry.email,
+                                          `Re: Church of God Dasmariñas - Your Message`,
+                                          `Dear ${inquiry.name},\n\nThank you for contacting Church of God Dasmariñas regarding your message:\n"${inquiry.message}"\n\n`
+                                        )}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         className="flex items-center gap-2 w-full text-foreground"
                                       >
                                         <Mail className="w-4 h-4 text-violet-500" />
-                                        <span>Reply via Email</span>
+                                        <span>Reply via Gmail</span>
                                       </a>
                                     </DropdownMenuItem>
 
@@ -864,6 +883,21 @@ export default function InquiriesPage() {
                           </p>
                         </div>
                       </div>
+
+                      {/* Ticket Category / Type */}
+                      {selectedInquiry.type && (
+                        <div className="flex items-center gap-3.5 pt-3">
+                          <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20 shadow-2xs">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] text-muted-foreground font-semibold">Category / Type</p>
+                            <p className="text-sm font-semibold text-foreground break-words select-text mt-0.5">
+                              {selectedInquiry.type}
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Contact Number */}
                       <div className="flex items-center gap-3.5 pt-3">

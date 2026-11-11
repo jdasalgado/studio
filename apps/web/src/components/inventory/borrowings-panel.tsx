@@ -1822,9 +1822,9 @@ export function BorrowingsPanel() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Good Condition" className="text-xs font-medium">Good Condition</SelectItem>
-                              <SelectItem value="Damaged" className="text-xs text-destructive font-semibold">Damaged (May Sira)</SelectItem>
-                              <SelectItem value="Repaired" className="text-xs text-emerald-600 font-semibold">Repaired (Naayos na)</SelectItem>
-                              <SelectItem value="Replaced" className="text-xs text-blue-600 font-semibold">Replaced (Napalitan na)</SelectItem>
+                              <SelectItem value="Damaged" className="text-xs text-destructive font-semibold">Damaged</SelectItem>
+                              <SelectItem value="Repaired" className="text-xs text-emerald-600 font-semibold">Repaired</SelectItem>
+                              <SelectItem value="Replaced" className="text-xs text-blue-600 font-semibold">Replaced</SelectItem>
                               <SelectItem value="Under Repair" className="text-xs text-amber-600 font-semibold">Under Repair / Maintenance</SelectItem>
                             </SelectContent>
                           </Select>
@@ -1850,7 +1850,7 @@ export function BorrowingsPanel() {
                           value={editReturnNotes}
                           maxLength={1000}
                           onChange={(e) => setEditReturnNotes(e.target.value)}
-                          placeholder="Ilagay dito ang mga parts na nadamage, naayos, o pinalitan (e.g., Napalitan ang camera lens, naayos ang charging port)..."
+                          placeholder="Describe any parts that were damaged, repaired, or replaced (e.g., Replaced camera lens, repaired charging port)..."
                           className="text-xs rounded-xl min-h-[75px] bg-background resize-none leading-relaxed"
                         />
                       </div>

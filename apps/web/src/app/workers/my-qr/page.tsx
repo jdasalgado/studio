@@ -43,6 +43,7 @@ import { useMinistries } from "@/hooks/use-ministries";
 import { updateWorker as updateWorkerSql, regenerateWorkerQrToken } from "@/actions/db";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { saveFileUniversal } from "@/lib/save-file-native";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function MyQRCodePage() {
@@ -131,19 +132,13 @@ export default function MyQRCodePage() {
   const handleDownload = async () => {
     if (!combinedQrUrl) return;
     try {
+      const filename = `COG-Pass-${workerProfile?.workerId || "my-qr"}.png`;
       const response = await fetch(combinedQrUrl);
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `COG-Pass-${workerProfile?.workerId || "my-qr"}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      await saveFileUniversal(blob, filename, "image/png");
       toast({
         title: "QR Code Downloaded",
-        description: "Your digital pass QR code has been saved as an image.",
+        description: "Your digital pass QR code has been saved to your device.",
       });
     } catch {
       window.open(combinedQrUrl, "_blank");
