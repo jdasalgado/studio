@@ -31,6 +31,8 @@ export default function QRScannerPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const isProcessingRef = useRef(false);
     const barcodeDetectorRef = useRef<any>(null);
+    const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastScannedCodeRef = useRef<{ code: string; time: number } | null>(null);
 
     // Initialize hardware-accelerated Native BarcodeDetector if available
     useEffect(() => {
@@ -184,6 +186,10 @@ export default function QRScannerPage() {
     }, []);
 
     const resetScanner = useCallback(() => {
+        if (resetTimeoutRef.current) {
+            clearTimeout(resetTimeoutRef.current);
+            resetTimeoutRef.current = null;
+        }
         isProcessingRef.current = false;
         setIsProcessing(false);
         setLastScanResult(null);
@@ -193,6 +199,23 @@ export default function QRScannerPage() {
             }
             videoRef.current.play().catch(() => {});
         }
+    }, []);
+
+    const scheduleReset = useCallback((delayMs: number) => {
+        if (resetTimeoutRef.current) {
+            clearTimeout(resetTimeoutRef.current);
+        }
+        resetTimeoutRef.current = setTimeout(() => {
+            resetScanner();
+        }, delayMs);
+    }, [resetScanner]);
+
+    useEffect(() => {
+        return () => {
+            if (resetTimeoutRef.current) {
+                clearTimeout(resetTimeoutRef.current);
+            }
+        };
     }, []);
 
     const addLog = (details: string, status: 'success' | 'warning' | 'error') => {
@@ -213,32 +236,34 @@ export default function QRScannerPage() {
         isProcessingRef.current = true;
         setIsProcessing(true);
 
-        const parts = data.split(':');
-        let rawWorkerId = parts[1] || parts[0];
-        let token: string | undefined = parts[2];
-        const type = parts[0];
-
-        if (parts.length === 1) {
-            // Direct Worker ID format
-            rawWorkerId = parts[0];
-            token = undefined;
-        } else if (type !== 'MEAL_STUB' && type !== 'COG_USER' && type !== 'ATTENDANCE' && type !== 'STATIC') {
-            playBeep('error');
-            toast({
-                variant: 'destructive',
-                title: 'Invalid QR Code',
-                description: 'This QR code is not formatted for meal stub claims.',
-            });
-            setLastScanResult({
-                workerName: 'Unknown',
-                message: 'Invalid QR Code Format',
-                status: 'error',
-            });
-            setTimeout(resetScanner, 2000);
-            return;
-        }
+        const resetDelay = Math.max(2, scannerSettings?.autoResetSeconds ?? 2.5) * 1000;
 
         try {
+            const parts = data.split(':');
+            let rawWorkerId = parts[1] || parts[0];
+            let token: string | undefined = parts[2];
+            const type = parts[0];
+
+            if (parts.length === 1) {
+                // Direct Worker ID format
+                rawWorkerId = parts[0];
+                token = undefined;
+            } else if (type !== 'MEAL_STUB' && type !== 'COG_USER' && type !== 'ATTENDANCE' && type !== 'STATIC') {
+                playBeep('error');
+                toast({
+                    variant: 'destructive',
+                    title: 'Invalid QR Code',
+                    description: 'This QR code is not formatted for meal stub claims.',
+                });
+                setLastScanResult({
+                    workerName: 'Unknown',
+                    message: 'Invalid QR Code Format',
+                    status: 'error',
+                });
+                scheduleReset(2000);
+                return;
+            }
+
             let worker = workers?.find(
                 w => w.id === rawWorkerId || w.workerId === rawWorkerId || w.email?.toLowerCase() === rawWorkerId.toLowerCase()
             );
@@ -268,7 +293,7 @@ export default function QRScannerPage() {
                     message: 'QR token has expired',
                     status: 'error',
                 });
-                setTimeout(resetScanner, 3000);
+                scheduleReset(3000);
                 return;
             }
 
@@ -351,6 +376,7 @@ export default function QRScannerPage() {
                     addLog(details, 'error');
                 }
             }
+            scheduleReset(resetDelay);
         } catch (e: any) {
             playBeep('error');
             console.error('Meal stub scan error:', e);
@@ -364,10 +390,9 @@ export default function QRScannerPage() {
                 message: 'Processing error occurred.',
                 status: 'error',
             });
-        } finally {
-            setTimeout(resetScanner, 2500);
+            scheduleReset(2500);
         }
-    }, [workers, toast, resetScanner, playBeep]);
+    }, [workers, toast, scheduleReset, playBeep, scannerSettings?.autoResetSeconds, createScanLogSql]);
 
     // Stable ref for handleScan so camera stream never restarts on scan
     const handleScanRef = useRef(handleScan);
@@ -445,13 +470,14 @@ export default function QRScannerPage() {
             if (!isScanning) return;
 
             if (videoElement.readyState >= 2 && !isProcessingRef.current) {
+                let detectedData: string | null = null;
+
                 // 1. Ultra-fast Native BarcodeDetector (< 2ms)
                 if (barcodeDetectorRef.current) {
                     try {
                         const barcodes = await barcodeDetectorRef.current.detect(videoElement);
-                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue && !isProcessingRef.current) {
-                            handleScanRef.current(barcodes[0].rawValue);
-                            return;
+                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                            detectedData = barcodes[0].rawValue;
                         }
                     } catch {
                         // Fall back to optimized canvas jsQR
@@ -459,26 +485,39 @@ export default function QRScannerPage() {
                 }
 
                 // 2. High-speed downsampled jsQR fallback (sub-8ms execution)
-                const vw = videoElement.videoWidth;
-                const vh = videoElement.videoHeight;
-                if (vw > 0 && vh > 0) {
-                    const scale = Math.min(1, 640 / Math.max(vw, vh));
-                    const scanWidth = Math.round(vw * scale);
-                    const scanHeight = Math.round(vh * scale);
+                if (!detectedData && !isProcessingRef.current) {
+                    const vw = videoElement.videoWidth;
+                    const vh = videoElement.videoHeight;
+                    if (vw > 0 && vh > 0) {
+                        const scale = Math.min(1, 640 / Math.max(vw, vh));
+                        const scanWidth = Math.round(vw * scale);
+                        const scanHeight = Math.round(vh * scale);
 
-                    if (canvas.width !== scanWidth || canvas.height !== scanHeight) {
-                        canvas.width = scanWidth;
-                        canvas.height = scanHeight;
+                        if (canvas.width !== scanWidth || canvas.height !== scanHeight) {
+                            canvas.width = scanWidth;
+                            canvas.height = scanHeight;
+                        }
+                        ctx.drawImage(videoElement, 0, 0, scanWidth, scanHeight);
+                        const imageData = ctx.getImageData(0, 0, scanWidth, scanHeight);
+                        const code = jsQR(imageData.data, scanWidth, scanHeight, {
+                            inversionAttempts: 'dontInvert',
+                        });
+
+                        if (code?.data) {
+                            detectedData = code.data;
+                        }
                     }
-                    ctx.drawImage(videoElement, 0, 0, scanWidth, scanHeight);
-                    const imageData = ctx.getImageData(0, 0, scanWidth, scanHeight);
-                    const code = jsQR(imageData.data, scanWidth, scanHeight, {
-                        inversionAttempts: 'dontInvert',
-                    });
+                }
 
-                    if (code?.data && !isProcessingRef.current) {
-                        handleScanRef.current(code.data);
-                        return;
+                if (detectedData && !isProcessingRef.current) {
+                    const now = Date.now();
+                    const isDuplicate = lastScannedCodeRef.current &&
+                        lastScannedCodeRef.current.code === detectedData &&
+                        (now - lastScannedCodeRef.current.time < 3500);
+
+                    if (!isDuplicate) {
+                        lastScannedCodeRef.current = { code: detectedData, time: now };
+                        handleScanRef.current(detectedData);
                     }
                 }
             }
@@ -640,7 +679,7 @@ export default function QRScannerPage() {
                                     <div className="w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 border-2 border-dashed border-primary/80 rounded-2xl animate-pulse" />
                                 </div>
 
-                                {isProcessing && (
+                                {isProcessing && !lastScanResult && (
                                     <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex flex-col items-center justify-center gap-2">
                                         <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
                                         <span className="text-xs font-bold text-white tracking-wide">Processing Scan...</span>
@@ -653,24 +692,35 @@ export default function QRScannerPage() {
                             {/* Live Result Feedback Banner */}
                             {lastScanResult && (
                                 <div
-                                    className={`p-3.5 rounded-xl border flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${lastScanResult.status === 'success'
+                                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 ${lastScanResult.status === 'success'
                                         ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
                                         : lastScanResult.status === 'warning'
                                             ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300'
                                             : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'
                                         }`}
                                 >
-                                    {lastScanResult.status === 'success' ? (
-                                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                                    ) : lastScanResult.status === 'warning' ? (
-                                        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-                                    ) : (
-                                        <XCircle className="h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                        <p className="font-bold text-xs">{lastScanResult.workerName}</p>
-                                        <p className="text-[11px] opacity-90">{lastScanResult.message}</p>
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        {lastScanResult.status === 'success' ? (
+                                            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                        ) : lastScanResult.status === 'warning' ? (
+                                            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                                        ) : (
+                                            <XCircle className="h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-bold text-xs">{lastScanResult.workerName}</p>
+                                            <p className="text-[11px] opacity-90">{lastScanResult.message}</p>
+                                        </div>
                                     </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={resetScanner}
+                                        className="h-7 px-2.5 text-[11px] font-semibold shrink-0 cursor-pointer rounded-lg bg-background/80 hover:bg-background shadow-none border-current/20"
+                                    >
+                                        Scan Next
+                                    </Button>
                                 </div>
                             )}
 
