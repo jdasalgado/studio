@@ -48,6 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       name,
       categoryId,
       type,
+      expiryDate,
       stock,
       quantity,
       minStock,
@@ -125,6 +126,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (isKit !== undefined) updateData.group = isKit ? 'Kit' : null;
     if (nextMaintenanceDate !== undefined) {
       updateData.nextMaintenanceDate = nextMaintenanceDate ? new Date(nextMaintenanceDate) : null;
+    }
+    if (expiryDate !== undefined) {
+      const finalType = type !== undefined ? (type.toUpperCase() === 'CONSUMABLE' ? 'CONSUMABLE' : 'EQUIPMENT') : currentItem.type;
+      if (finalType === 'CONSUMABLE') {
+        if (expiryDate) {
+          const d = new Date(expiryDate);
+          if (isNaN(d.getTime())) {
+            return NextResponse.json({ error: 'Invalid Expiration Date format.' }, { status: 400 });
+          }
+          updateData.expiryDate = d;
+        } else {
+          updateData.expiryDate = null;
+        }
+      } else {
+        updateData.expiryDate = null;
+      }
     }
     if (parentId !== undefined) updateData.parentId = parentId || null;
     if (inventoryCode !== undefined) updateData.inventoryCode = inventoryCode;

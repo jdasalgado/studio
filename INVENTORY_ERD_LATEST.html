@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Inventory Management System - Latest ERD</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .header {
+      background: #1c4184;
+      color: white;
+      padding: 20px 24px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .header h1 {
+      margin: 0 0 6px 0;
+      font-size: 24px;
+    }
+    .header p {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .btn {
+      background: white;
+      color: #1c4184;
+      border: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .btn:hover {
+      background: #f1f5f9;
+    }
+    .diagram-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow-x: auto;
+    }
+    .legend {
+      margin-top: 24px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+      color: #1c4184;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Inventory Management System — Latest ERD</h1>
+    <p>Entity-Relationship Diagram including Damaged / Lost Item Tracking, Accessories Verification, Resolution Workflow, and PDF Incident Reports.</p>
+    <div class="actions">
+      <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+      <button class="btn" onclick="downloadSVG()">⬇️ Download as SVG</button>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <div class="mermaid" id="mermaid-erd">
+erDiagram
+    Worker ||--o{ InventoryBorrowing : "borrows"
+    Worker ||--o{ InventoryLog : "initiates_action"
+    Worker ||--o{ TransactionLog : "operates"
+    
+    InventoryCategory ||--o{ InventoryItem : "categorizes"
+    
+    InventoryItem ||--o{ InventoryItem : "bundle_kit_children (parentId)"
+    InventoryItem ||--o{ InventoryBorrowing : "is_borrowed"
+    InventoryItem ||--o{ InventoryLog : "logs_history"
+    
+    InventoryBorrowing ||..o{ IncidentReportPDF : "auto_generates"
+
+    Worker {
+        String id PK "UUID"
+        String workerId "Worker / Staff Code"
+        String firstName "First Name"
+        String lastName "Last Name"
+        String email UK "Worker Email"
+        String status "Active / Inactive"
+    }
+
+    InventoryCategory {
+        String id PK "UUID"
+        String name UK "Category Name"
+        String color "Badge / UI Hex Color"
+        String icon "Lucide Icon Name"
+        String group "Equipment / Consumable"
+        Boolean isActive "Active status"
+    }
+
+    InventoryItem {
+        String id PK "UUID"
+        String inventoryCode UK "Item Barcode / QR Code"
+        String name "Item Description / Name"
+        String categoryId FK "Reference to InventoryCategory"
+        String type "EQUIPMENT or CONSUMABLE"
+        Int quantity "Current Available Stock"
+        Int minQuantity "Low-stock alert threshold"
+        String unit "pcs, sets, boxes, etc."
+        String status "Good Condition, Damaged, Borrowed"
+        String statusDetails "Detailed status notes"
+        String group "Single or Kit / Bundle"
+        String parentId FK "Self-referencing Bundle Parent"
+        String location "Storage Room / Venue"
+        String aisle "Aisle Location"
+        String shelf "Shelf Location"
+        String bin "Bin / Rack Location"
+        String imageUrl "Item display photo"
+        DateTime nextMaintenanceDate "Scheduled maintenance"
+        DateTime createdAt "Creation timestamp"
+        DateTime updatedAt "Last update timestamp"
+    }
+
+    InventoryBorrowing {
+        String id PK "UUID"
+        String itemId FK "Reference to InventoryItem"
+        String borrowerId FK "Reference to Worker"
+        DateTime borrowedAt "Checkout timestamp"
+        DateTime dueDate "Borrow due / Target resolution deadline"
+        DateTime returnedAt "Actual check-in timestamp"
+        String status "BORROWED, RETURNED, PENDING"
+        String checkoutCondition "Condition at checkout"
+        String checkoutNotes "Purpose / Remarks upon checkout"
+        Json checkoutChecklist "Includes issued accessories: Lens, Battery, SD Card, etc."
+        String returnCondition "Good, Damaged, Lost, Missing Gear, Resolved"
+        String returnNotes "Inspection / damage / loss incident notes"
+        Json returnChecklist "Returned vs missing accessories & target resolution deadline"
+        String_Array returnPhotos "Base64 or Cloud URLs of damage evidence"
+    }
+
+    InventoryLog {
+        String id PK "UUID"
+        String itemId FK "Reference to InventoryItem"
+        String workerId FK "Staff / Actor Worker ID"
+        String type "Checkout, Return, Adjustment, Restored"
+        Int quantity "Quantity changed"
+        Int balance "Remaining stock balance after action"
+        String notes "Audit trail details"
+        DateTime timestamp "Action timestamp"
+    }
+
+    TransactionLog {
+        String id PK "UUID"
+        String userId "Operator User ID"
+        String userEmail "Operator Email"
+        String userName "Operator Name"
+        String module "Inventory"
+        String action "Checkout, Return, Report Generated, Restored"
+        String details "Human-readable activity summary"
+        String targetId "Target Item or Borrowing ID"
+        String targetName "Target Item Name"
+        DateTime timestamp "Audit timestamp"
+    }
+
+    IncidentReportPDF {
+        String reportId "RPT-XXXX (Auto-generated)"
+        DateTime reportDate "Date & time of generation"
+        String reportedBy "Staff / Admin processor"
+        String incidentType "DAMAGED, LOST, or MISSING"
+        String itemDetails "Name, Code, Category, Borrowing ID"
+        String borrowerDetails "Name, ID, Email, Borrow & Return Dates"
+        String incidentContext "Condition details & inspection notes"
+        Json accessoriesStatus "Table of included items with Returned / Lost"
+        String damagePhotoUrl "Embedded damage/loss evidence image"
+        String resolutionInfo "Target repair/settlement deadline & notes"
+        String signatures "Borrower, Staff, Authorized Officer sign-offs"
+    }
+    </div>
+  </div>
+
+  <div class="legend">
+    <h3 style="margin-top:0; color:#1c4184;">New Features & Attributes Summary</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Entity / Table</th>
+          <th>Attributes / Columns</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Damage / Lost Check-in</strong></td>
+          <td><code>InventoryBorrowing</code></td>
+          <td><code>status</code>, <code>returnCondition</code>, <code>returnNotes</code></td>
+          <td>Flags items as PENDING when damaged or lost; prevents automatic restoration into available inventory.</td>
+        </tr>
+        <tr>
+          <td><strong>Accessories Verification</strong></td>
+          <td><code>InventoryBorrowing</code></td>
+          <td><code>checkoutChecklist</code>, <code>returnChecklist</code></td>
+          <td>JSON fields storing which accessories (Battery, Lens, SD Card, etc.) were issued vs returned or lost.</td>
+        </tr>
+        <tr>
+          <td><strong>Damage Photo Evidence</strong></td>
+          <td><code>InventoryBorrowing</code></td>
+          <td><code>returnPhotos</code></td>
+          <td>Stores photos captured via mobile camera or uploaded during check-in inspection.</td>
+        </tr>
+        <tr>
+          <td><strong>Resolution & Stock Restore</strong></td>
+          <td><code>InventoryBorrowing</code>, <code>InventoryItem</code>, <code>InventoryLog</code></td>
+          <td><code>dueDate</code>, <code>status</code>, <code>quantity</code></td>
+          <td>Tracks target resolution date; restores item stock and writes audit log once resolved.</td>
+        </tr>
+        <tr>
+          <td><strong>Incident Report PDF</strong></td>
+          <td>Client Export Engine</td>
+          <td><code>generateIncidentReportPDF()</code></td>
+          <td>Compiles borrowing details, photo evidence, accessories status, and signatures into dark blue PDF.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+
+    function downloadSVG() {
+      const svg = document.querySelector('#mermaid-erd svg');
+      if (!svg) {
+        alert('SVG not yet ready, please wait a moment.');
+        return;
+      }
+      const serializer = new XMLSerializer();
+      const source = serializer.serializeToString(svg);
+      const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Inventory-ERD-Latest.svg';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

@@ -24,6 +24,7 @@ export interface InventoryItem {
   isKit?: boolean;
   group?: string;
   nextMaintenanceDate?: string;
+  expiryDate?: string | null;
   parentId?: string;
   category?: { id: string; name: string; color?: string; icon?: string };
   children?: any[];

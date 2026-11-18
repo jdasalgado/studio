@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   ClipboardCheck,
   Download,
+  Wrench,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/app-layout';
 import {
@@ -387,13 +388,20 @@ function InventoryPageContent() {
                   iconBgClass="bg-emerald-50 dark:bg-emerald-950/40"
                 />
                 <StatCard
-                  label="VERIFICATION REQUIRED"
-                  value={stats?.borrowedCount ?? 0}
-                  sub="Inspection on return"
-                  icon={ClipboardCheck}
-                  accentColor="bg-sky-500"
-                  iconClass="text-sky-600 dark:text-sky-400"
-                  iconBgClass="bg-sky-50 dark:bg-sky-950/40"
+                  label="PENDING / DAMAGED"
+                  value={stats?.pendingDamagedCount ?? 0}
+                  sub="Needs repair or replacement"
+                  icon={Wrench}
+                  accentColor="bg-amber-500"
+                  iconClass="text-amber-600 dark:text-amber-400"
+                  iconBgClass="bg-amber-50 dark:bg-amber-950/40"
+                  badge={
+                    (stats?.pendingDamagedCount ?? 0) > 0 ? (
+                      <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] px-1.5 py-0 font-bold rounded-full">
+                        Action Needed
+                      </Badge>
+                    ) : null
+                  }
                 />
               </>
             )}

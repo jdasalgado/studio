@@ -701,31 +701,42 @@ export function StockScanModal({
                   </div>
                 </div>
 
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider shadow-2xs",
-                    activeBorrowingData.status === 'RETURNED'
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                      : activeBorrowingData.dueDate && new Date(activeBorrowingData.dueDate) < new Date()
-                      ? "bg-rose-500/15 text-rose-600 border border-rose-500/30"
-                      : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
-                  )}
-                >
-                  <span className={cn(
-                    "h-1.5 w-1.5 rounded-full mr-1.5",
-                    activeBorrowingData.status === 'RETURNED'
-                      ? "bg-emerald-500"
-                      : activeBorrowingData.dueDate && new Date(activeBorrowingData.dueDate) < new Date()
-                      ? "bg-rose-500"
-                      : "bg-sky-500 animate-pulse"
-                  )} />
-                  {activeBorrowingData.status === 'RETURNED'
-                    ? 'Returned'
-                    : activeBorrowingData.dueDate && new Date(activeBorrowingData.dueDate) < new Date()
-                    ? 'Overdue'
-                    : 'Active Borrowed'}
-                </Badge>
+                {(() => {
+                  const isDamagedPending = activeBorrowingData.status === 'PENDING' || activeBorrowingData.returnCondition === 'Damaged';
+                  return (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider shadow-2xs",
+                        isDamagedPending
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                          : activeBorrowingData.status === 'RETURNED'
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                          : activeBorrowingData.dueDate && new Date(activeBorrowingData.dueDate) < new Date()
+                          ? "bg-rose-500/15 text-rose-600 border border-rose-500/30"
+                          : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
+                      )}
+                    >
+                      <span className={cn(
+                        "h-1.5 w-1.5 rounded-full mr-1.5",
+                        isDamagedPending
+                          ? "bg-amber-500 animate-pulse"
+                          : activeBorrowingData.status === 'RETURNED'
+                          ? "bg-emerald-500"
+                          : activeBorrowingData.dueDate && new Date(activeBorrowingData.dueDate) < new Date()
+                          ? "bg-rose-500"
+                          : "bg-sky-500 animate-pulse"
+                      )} />
+                      {isDamagedPending
+                        ? 'Pending (Damaged)'
+                        : activeBorrowingData.status === 'RETURNED'
+                        ? 'Returned'
+                        : activeBorrowingData.dueDate && new Date(activeBorrowingData.dueDate) < new Date()
+                        ? 'Overdue'
+                        : 'Active Borrowed'}
+                    </Badge>
+                  );
+                })()}
               </div>
 
               <div className="p-4 sm:p-5 space-y-4 bg-card">
@@ -1036,15 +1047,27 @@ export function StockScanModal({
                   </div>
                 ) : (
                   <div className="space-y-3 pt-2 border-t border-border/60">
-                    <div className="p-3 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Returned &amp; Completed Transaction</span>
+                    {activeBorrowingData.status === 'PENDING' || activeBorrowingData.returnCondition === 'Damaged' ? (
+                      <div className="p-3 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl text-xs text-amber-900 dark:text-amber-200 font-semibold flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <span>Pending Resolution (Damaged Item)</span>
+                        </div>
+                        <Badge variant="outline" className="bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40 text-[10px]">
+                          Resolve Required
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 text-[10px]">
-                        Saved in Database
-                      </Badge>
-                    </div>
+                    ) : (
+                      <div className="p-3 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>Returned &amp; Completed Transaction</span>
+                        </div>
+                        <Badge variant="outline" className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 text-[10px]">
+                          Saved in Database
+                        </Badge>
+                      </div>
+                    )}
 
                     <div className="p-3 bg-muted/30 border border-border/60 rounded-xl space-y-2 text-xs">
                       <div className="flex justify-between items-center text-[11px]">

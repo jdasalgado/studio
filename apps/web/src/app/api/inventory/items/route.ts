@@ -125,6 +125,7 @@ export async function POST(req: NextRequest) {
       name,
       categoryId,
       type = 'EQUIPMENT',
+      expiryDate,
       stock = 0,
       quantity,
       minStock = 0,
@@ -174,6 +175,16 @@ export async function POST(req: NextRequest) {
     const finalType = (type || 'EQUIPMENT').toUpperCase() === 'CONSUMABLE' ? 'CONSUMABLE' : 'EQUIPMENT';
     const finalLocation = location || locationId || null;
 
+    // Expiration date is strictly for Consumable items only
+    let parsedExpiryDate: Date | null = null;
+    if (finalType === 'CONSUMABLE' && expiryDate) {
+      const d = new Date(expiryDate);
+      if (isNaN(d.getTime())) {
+        return NextResponse.json({ error: 'Invalid Expiration Date format.' }, { status: 400 });
+      }
+      parsedExpiryDate = d;
+    }
+
     // Generate inventoryCode if not provided
     let finalCode = inventoryCode?.trim();
     if (!finalCode) {
@@ -187,6 +198,7 @@ export async function POST(req: NextRequest) {
         name,
         categoryId,
         type: finalType,
+        expiryDate: parsedExpiryDate,
         quantity: finalQuantity,
         minQuantity: finalMinQuantity,
         unit,

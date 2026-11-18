@@ -5,7 +5,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
     const body = await req.json();
-    const { action, quantity = 1, notes, workerId, actorId, actorName, actorEmail } = body;
+    const { action, quantity = 1, notes, workerId, recipient, activity, actorId, actorName, actorEmail } = body;
 
     const item = await prisma.inventoryItem.findUnique({ where: { id } });
     if (!item) {
@@ -18,6 +18,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (action === 'Stock In') {
       newStock += qty;
     } else if (action === 'Stock Out') {
+      // Prevent expired consumable items from being issued or distributed
+      if (item.type === 'CONSUMABLE' && item.expiryDate && new Date(item.expiryDate) < new Date()) {
+        return NextResponse.json(
+          {
+            error: `Cannot issue or distribute expired consumable item. "${item.name}" expired on ${new Date(item.expiryDate).toLocaleDateString()}. Please replace or dispose of expired stock.`,
+          },
+          { status: 400 }
+        );
+      }
+
       if (item.quantity < qty) {
         return NextResponse.json({ error: `Not enough stock. Available: ${item.quantity}` }, { status: 400 });
       }
@@ -52,7 +62,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           type: action === 'Adjust' ? 'Adjustment' : action,
           quantity: action === 'Adjust' || action === 'Adjustment' ? Math.abs(newStock - item.quantity) : qty,
           balance: newStock,
-          notes: notes || `Quick ${action} (${action === 'Stock In' ? '+' : '-'}${qty})`,
+          notes:
+            notes ||
+            (recipient
+              ? `Issued ${qty} ${item.unit || 'pcs'} to ${recipient}${activity ? ` for ${activity}` : ''}`
+              : `Quick ${action} (${action === 'Stock In' ? '+' : '-'}${qty})`),
         },
       }),
     ]);

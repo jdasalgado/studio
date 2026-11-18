@@ -6,11 +6,27 @@ export async function GET() {
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
+    // Auto-migrate legacy returned records that were marked as Damaged to PENDING
+    try {
+      await prisma.inventoryBorrowing.updateMany({
+        where: {
+          status: 'RETURNED',
+          returnCondition: { contains: 'Damaged', mode: 'insensitive' },
+        },
+        data: {
+          status: 'PENDING',
+        },
+      });
+    } catch (e) {
+      console.warn('Dashboard stats auto-migration skipped:', e);
+    }
+
     const [
       totalItems,
       borrowedCount,
       overdueCount,
       returnedCount,
+      pendingDamagedCount,
       outOfStock,
       allItems,
       totalLogs,
@@ -27,7 +43,20 @@ export async function GET() {
           dueDate: { lt: new Date() },
         },
       }),
-      prisma.inventoryBorrowing.count({ where: { status: 'RETURNED' } }),
+      prisma.inventoryBorrowing.count({
+        where: {
+          status: 'RETURNED',
+          NOT: { returnCondition: { contains: 'Damaged', mode: 'insensitive' } },
+        },
+      }),
+      prisma.inventoryBorrowing.count({
+        where: {
+          OR: [
+            { status: 'PENDING' },
+            { returnCondition: { contains: 'Damaged', mode: 'insensitive' } },
+          ],
+        },
+      }),
       prisma.inventoryItem.count({ where: { quantity: 0 } }),
       prisma.inventoryItem.findMany({
         select: { quantity: true, minQuantity: true, nextMaintenanceDate: true, type: true, categoryId: true },
@@ -52,6 +81,7 @@ export async function GET() {
       borrowedCount,
       overdueCount,
       returnedCount,
+      pendingDamagedCount,
       lowStockAlerts,
       outOfStock,
       pmsAlerts,
@@ -73,6 +103,7 @@ export async function GET() {
       borrowedCount: 0,
       overdueCount: 0,
       returnedCount: 0,
+      pendingDamagedCount: 0,
       lowStockAlerts: 0,
       outOfStock: 0,
       pmsAlerts: 0,

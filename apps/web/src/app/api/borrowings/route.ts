@@ -9,9 +9,56 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || '';
     const borrowerId = searchParams.get('borrowerId') || '';
 
+    // Auto-migrate legacy returned records that were marked as Damaged, Lost, or Missing to PENDING
+    try {
+      await prisma.inventoryBorrowing.updateMany({
+        where: {
+          status: 'RETURNED',
+          OR: [
+            { returnCondition: { contains: 'Damaged', mode: 'insensitive' } },
+            { returnCondition: { contains: 'Lost', mode: 'insensitive' } },
+            { returnCondition: { contains: 'Missing', mode: 'insensitive' } },
+          ],
+        },
+        data: {
+          status: 'PENDING',
+        },
+      });
+
+      // Ensure equipment items with available stock (> 0) remain in Good Condition
+      await prisma.inventoryItem.updateMany({
+        where: {
+          type: 'EQUIPMENT',
+          quantity: { gt: 0 },
+          status: 'Damaged',
+        },
+        data: {
+          status: 'Good Condition',
+        },
+      });
+    } catch (e) {
+      console.warn('Auto-migration of damaged/lost borrowings skipped:', e);
+    }
+
     const where: any = {};
     if (status) {
-      where.status = status;
+      if (status === 'PENDING') {
+        where.OR = [
+          { status: 'PENDING' },
+          { returnCondition: { contains: 'Damaged', mode: 'insensitive' } },
+          { returnCondition: { contains: 'Lost', mode: 'insensitive' } },
+          { returnCondition: { contains: 'Missing', mode: 'insensitive' } },
+        ];
+      } else if (status === 'RETURNED') {
+        where.status = 'RETURNED';
+        where.NOT = [
+          { returnCondition: { contains: 'Damaged', mode: 'insensitive' } },
+          { returnCondition: { contains: 'Lost', mode: 'insensitive' } },
+          { returnCondition: { contains: 'Missing', mode: 'insensitive' } },
+        ];
+      } else {
+        where.status = status;
+      }
     }
     if (borrowerId) {
       where.borrowerId = borrowerId;
@@ -90,9 +137,6 @@ export async function POST(req: NextRequest) {
     const numQty = Number(quantity) || 1;
 
     for (const it of itemsToCheckout) {
-      if (it.status === 'Damaged') {
-        return NextResponse.json({ error: `${it.name} is marked as Damaged and cannot be checked out.` }, { status: 400 });
-      }
       if (it.quantity < numQty) {
         return NextResponse.json({ error: `Not enough stock for ${it.name} (Only ${it.quantity} available).` }, { status: 400 });
       }
@@ -127,7 +171,7 @@ export async function POST(req: NextRequest) {
           where: { id: it.id },
           data: {
             quantity: newStock,
-            status: newStock === 0 && it.type === 'EQUIPMENT' ? 'Borrowed' : it.status,
+            status: newStock === 0 && it.type === 'EQUIPMENT' ? 'Borrowed' : (newStock > 0 && it.status === 'Damaged' ? 'Good Condition' : it.status),
           },
         });
 

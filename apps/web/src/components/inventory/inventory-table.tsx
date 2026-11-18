@@ -24,6 +24,9 @@ import {
   Boxes,
   Tag,
   Activity,
+  RotateCcw,
+  Clock,
+  CalendarX2,
 } from 'lucide-react';
 import {
   Table,
@@ -58,8 +61,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from '@studio/ui';
-import { cn } from '@/lib/utils';
+} from '@studio/ui';import { cn } from '@/lib/utils';
 import { useInventory, type InventoryItem } from '@/hooks/use-inventory';
 import { useUserRole } from '@/hooks/use-user-role';
 import { useAuthStore } from '@studio/store';
@@ -115,6 +117,22 @@ const getCategoryStyleProps = (category?: { name?: string; color?: string | null
   };
 };
 
+
+// Helper: get expiry status for consumable items
+const getExpiryStatus = (expiryDate?: string | Date | null): 'expired' | 'soon' | 'valid' | null => {
+  if (!expiryDate) return null;
+  const exp = new Date(expiryDate);
+  const now = new Date();
+  if (exp < now) return 'expired';
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  if (exp <= thirtyDaysFromNow) return 'soon';
+  return 'valid';
+};
+
+const formatExpiryDate = (expiryDate?: string | Date | null): string => {
+  if (!expiryDate) return '';
+  return new Date(expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 interface InventoryTableProps {
   onScanClick?: () => void;
@@ -198,6 +216,17 @@ export function InventoryTable({
   const [adjustQuantity, setAdjustQuantity] = useState<number>(1);
   const [adjustNote, setAdjustNote] = useState<string>('');
   const [isAdjusting, setIsAdjusting] = useState<boolean>(false);
+  // Extra fields for consumable Stock Out issuance tracking
+  const [adjustIssuedTo, setAdjustIssuedTo] = useState<string>('');
+  const [adjustActivity, setAdjustActivity] = useState<string>('');
+
+  // Consumable Return Dialog State
+  const [consumableReturnItem, setConsumableReturnItem] = useState<InventoryItem | null>(null);
+  const [returnIssuedQty, setReturnIssuedQty] = useState<number>(1);
+  const [returnReturnedQty, setReturnReturnedQty] = useState<number>(0);
+  const [returnNotes, setReturnNotes] = useState<string>('');
+  const [returnRecipient, setReturnRecipient] = useState<string>('');
+  const [isRecordingReturn, setIsRecordingReturn] = useState<boolean>(false);
 
   const loadData = useCallback(() => {
     const params: any = {
@@ -317,7 +346,16 @@ export function InventoryTable({
 
     setIsAdjusting(true);
     try {
-      await updateStock(stockAdjustItem.id, adjustAction, adjustQuantity, adjustNote.trim() || undefined, currentActor);
+      // Build a rich audit note for consumable Stock Out issuances
+      let finalNote = adjustNote.trim();
+      if (stockAdjustItem.type === 'CONSUMABLE' && adjustAction === 'Stock Out') {
+        const parts: string[] = [];
+        if (adjustIssuedTo.trim()) parts.push(`Issued to: ${adjustIssuedTo.trim()}`);
+        if (adjustActivity.trim()) parts.push(`Activity: ${adjustActivity.trim()}`);
+        if (finalNote) parts.push(finalNote);
+        finalNote = parts.join(' | ') || `Issued ${adjustQuantity} ${stockAdjustItem.unit || 'pcs'} of ${stockAdjustItem.name}`;
+      }
+      await updateStock(stockAdjustItem.id, adjustAction, adjustQuantity, finalNote || undefined, currentActor);
       toast({
         title: 'Stock adjusted successfully',
         description: `${adjustAction} of ${adjustQuantity} ${stockAdjustItem.unit || 'pcs'} applied to ${stockAdjustItem.name}.`,
@@ -325,6 +363,8 @@ export function InventoryTable({
       setStockAdjustItem(null);
       setAdjustQuantity(1);
       setAdjustNote('');
+      setAdjustIssuedTo('');
+      setAdjustActivity('');
       loadData();
     } catch (err: any) {
       toast({
@@ -337,9 +377,53 @@ export function InventoryTable({
     }
   };
 
+  // Consumable Return Submit
+  const handleConsumableReturn = async () => {
+    if (!consumableReturnItem) return;
+    if (returnIssuedQty <= 0) {
+      toast({ variant: 'destructive', title: 'Invalid quantity', description: 'Issued quantity must be greater than zero.' });
+      return;
+    }
+    if (returnReturnedQty < 0 || returnReturnedQty > returnIssuedQty) {
+      toast({ variant: 'destructive', title: 'Invalid returned quantity', description: 'Returned quantity cannot exceed the issued quantity.' });
+      return;
+    }
+    setIsRecordingReturn(true);
+    try {
+      const res = await fetch(`/api/inventory/items/${consumableReturnItem.id}/consumable-return`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issuedQuantity: returnIssuedQty,
+          returnedQuantity: returnReturnedQty,
+          notes: returnNotes.trim() || undefined,
+          workerName: returnRecipient.trim() || currentActor.name,
+          actorId: currentActor.id,
+          actorName: currentActor.name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to record return');
+      const summary = data.summary || data;
+      toast({
+        title: 'Consumable return recorded',
+        description: `${summary.usedQuantity} ${consumableReturnItem.unit || 'pcs'} used, ${summary.returnedQuantity} returned to stock. New stock: ${summary.newStock} ${consumableReturnItem.unit || 'pcs'}.`,
+      });
+      setConsumableReturnItem(null);
+      setReturnIssuedQty(1);
+      setReturnReturnedQty(0);
+      setReturnNotes('');
+      setReturnRecipient('');
+      loadData();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Return failed', description: err.message || 'Failed to record consumable return' });
+    } finally {
+      setIsRecordingReturn(false);
+    }
+  };
+
   // Single Delete
-  const confirmDelete = async () => {
-    if (!deleteConfirmId) return;
+  const confirmDelete = async () => {    if (!deleteConfirmId) return;
     try {
       await deleteItem(deleteConfirmId);
       toast({
@@ -890,6 +974,22 @@ export function InventoryTable({
                                 <QrCode className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span>Print QR Label</span>
                               </DropdownMenuItem>
+                              {/* Record Return — CONSUMABLE ONLY */}
+                              {item.type === 'CONSUMABLE' && (
+                                <DropdownMenuItem
+                                  className="gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                                  onClick={() => {
+                                    setConsumableReturnItem(item);
+                                    setReturnIssuedQty(1);
+                                    setReturnReturnedQty(0);
+                                    setReturnNotes('');
+                                    setReturnRecipient('');
+                                  }}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span>Record Return</span>
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator className="my-1 bg-border/60" />
                               <DropdownMenuItem
                                 className="gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 focus:text-rose-700 focus:bg-rose-50 dark:focus:bg-rose-950/40 transition-colors"
@@ -969,6 +1069,27 @@ export function InventoryTable({
                             <p className="font-semibold text-foreground truncate capitalize">
                               {item.type?.toLowerCase() || 'Equipment'}
                             </p>
+                            {item.type === 'CONSUMABLE' && item.expiryDate && (() => {
+                              const status = getExpiryStatus(item.expiryDate);
+                              const dateStr = formatExpiryDate(item.expiryDate);
+                              if (status === 'expired') return (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold mt-0.5 text-red-600 dark:text-red-400">
+                                  <CalendarX2 className="h-2.5 w-2.5 shrink-0" />
+                                  Expired {dateStr}
+                                </span>
+                              );
+                              if (status === 'soon') return (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold mt-0.5 text-amber-600 dark:text-amber-400">
+                                  <Clock className="h-2.5 w-2.5 shrink-0" />
+                                  Exp. Soon {dateStr}
+                                </span>
+                              );
+                              return (
+                                <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                                  Exp. {dateStr}
+                                </span>
+                              );
+                            })()}
                           </div>
 
                           <div className="col-span-2 pt-1 border-t border-border/30">
@@ -1137,19 +1258,42 @@ export function InventoryTable({
 
                           {/* 5. Type */}
                           <TableCell className="py-3">
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
-                              {item.type === 'CONSUMABLE' ? (
-                                <>
-                                  <Layers className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                                  <span>Consumable</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Package className="h-3 w-3 text-sky-600 dark:text-sky-400" />
-                                  <span>Equipment</span>
-                                </>
-                              )}
-                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
+                                {item.type === 'CONSUMABLE' ? (
+                                  <>
+                                    <Layers className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Consumable</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Package className="h-3 w-3 text-sky-600 dark:text-sky-400" />
+                                    <span>Equipment</span>
+                                  </>
+                                )}
+                              </span>
+                              {item.type === 'CONSUMABLE' && item.expiryDate && (() => {
+                                const status = getExpiryStatus(item.expiryDate);
+                                const dateStr = formatExpiryDate(item.expiryDate);
+                                if (status === 'expired') return (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/50 whitespace-nowrap">
+                                    <CalendarX2 className="h-2.5 w-2.5 shrink-0" />
+                                    Expired {dateStr}
+                                  </span>
+                                );
+                                if (status === 'soon') return (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50 whitespace-nowrap">
+                                    <Clock className="h-2.5 w-2.5 shrink-0" />
+                                    Exp. Soon {dateStr}
+                                  </span>
+                                );
+                                return (
+                                  <span className="text-[10px] text-muted-foreground font-mono whitespace-nowrap">
+                                    Exp. {dateStr}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </TableCell>
 
                           {/* 6. Stock Level & Health Indicator (Static Red Alert, Red Dot + Compact Badge) */}
@@ -1280,6 +1424,23 @@ export function InventoryTable({
                                     <QrCode className="h-3.5 w-3.5 text-muted-foreground" />
                                     <span>Print QR Label</span>
                                   </DropdownMenuItem>
+
+                                  {/* Record Return — CONSUMABLE ONLY */}
+                                  {item.type === 'CONSUMABLE' && (
+                                    <DropdownMenuItem
+                                      className="gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg cursor-pointer text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                                      onClick={() => {
+                                        setConsumableReturnItem(item);
+                                        setReturnIssuedQty(1);
+                                        setReturnReturnedQty(0);
+                                        setReturnNotes('');
+                                        setReturnRecipient('');
+                                      }}
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
+                                      <span>Record Return</span>
+                                    </DropdownMenuItem>
+                                  )}
 
                                   <DropdownMenuSeparator className="my-1 bg-border/60" />
 
@@ -1523,6 +1684,38 @@ export function InventoryTable({
                       Reason / Audit Note
                     </span>
                   </div>
+
+                  {/* Consumable Stock Out — Issuance tracking fields */}
+                  {stockAdjustItem.type === 'CONSUMABLE' && adjustAction === 'Stock Out' && (
+                    <div className="space-y-2.5 pb-2 border-b border-border/40">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Issuance Record</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">(consumable tracking)</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-foreground">Issued To (Recipient)</Label>
+                        <Input
+                          placeholder="e.g. John Dave, Worship Team, Media Ministry..."
+                          value={adjustIssuedTo}
+                          onChange={(e) => setAdjustIssuedTo(e.target.value)}
+                          className="h-9 text-xs rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-foreground">Activity / Purpose</Label>
+                        <Input
+                          placeholder="e.g. Sunday Service, Prayer Night, Outreach..."
+                          value={adjustActivity}
+                          onChange={(e) => setAdjustActivity(e.target.value)}
+                          className="h-9 text-xs rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs"
+                        />
+                      </div>
+                      <p className="text-[10.5px] text-muted-foreground leading-relaxed bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 rounded-lg px-2.5 py-1.5">
+                        💡 After the activity, use <strong className="text-foreground">Record Return</strong> to add unused items back to stock.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="space-y-1.5">
                     <Input
                       placeholder="e.g. Shipment arrival, Sunday service use, Damaged replacement..."
@@ -1558,6 +1751,182 @@ export function InventoryTable({
                 >
                   {isAdjusting ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                   <span>Confirm {adjustAction} ({adjustAction === 'Stock In' ? `+${adjustQuantity}` : `-${adjustQuantity}`})</span>
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* ── QR CODE MODAL ── */}
+        <QRModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} items={qrItems} />
+
+        {/* ── CONSUMABLE RETURN MODAL ── */}
+        {consumableReturnItem && (
+          <Dialog open={!!consumableReturnItem} onOpenChange={(open) => !open && setConsumableReturnItem(null)}>
+            <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] sm:max-w-lg max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-3xl border-border/80 shadow-2xl bg-background [&>button:last-child]:hidden">
+              {/* Header */}
+              <DialogHeader className="p-5 pb-4 border-b border-border/70 bg-card/80 backdrop-blur-md shrink-0 text-left sticky top-0 z-10">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-11 w-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
+                      <RotateCcw className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <DialogTitle className="text-base sm:text-lg font-bold font-headline tracking-tight text-foreground flex items-center gap-2 flex-wrap">
+                        <span>Record Consumable Return</span>
+                        {consumableReturnItem.inventoryCode && (
+                          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 shrink-0">
+                            {consumableReturnItem.inventoryCode}
+                          </span>
+                        )}
+                      </DialogTitle>
+                      <DialogDescription asChild>
+                        <div className="text-xs text-muted-foreground leading-relaxed space-y-0.5">
+                          <p>Recording unused items returned for <strong className="text-foreground">{consumableReturnItem.name}</strong>.</p>
+                          <p className="text-[11px]">Current stock: <strong className="text-foreground font-semibold">{consumableReturnItem.stock} {consumableReturnItem.unit || 'pcs'}</strong></p>
+                        </div>
+                      </DialogDescription>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConsumableReturnItem(null)}
+                    className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/80 cursor-pointer shrink-0 -mt-1 -mr-1"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
+                  </Button>
+                </div>
+              </DialogHeader>
+
+              {/* Body */}
+              <div className="p-5 space-y-4 overflow-y-auto flex-1">
+                {/* Issued Quantity */}
+                <div className="p-4 rounded-2xl border border-border/70 bg-card/60 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2 pb-1 border-b border-border/50">
+                    <Boxes className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-xs font-bold text-foreground uppercase tracking-wider">Quantities</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        Originally Issued
+                      </Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        placeholder="e.g. 10"
+                        value={returnIssuedQty === 0 ? '' : returnIssuedQty}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setReturnIssuedQty(digits === '' ? 0 : parseInt(digits, 10));
+                        }}
+                        className="h-10 text-xs font-bold rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">
+                        Returned (Unused)
+                      </Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        placeholder="e.g. 3"
+                        value={returnReturnedQty === 0 ? '' : returnReturnedQty}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setReturnReturnedQty(digits === '' ? 0 : parseInt(digits, 10));
+                        }}
+                        className="h-10 text-xs font-bold rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      {returnReturnedQty > returnIssuedQty && returnIssuedQty > 0 && (
+                        <p className="text-[11px] text-destructive flex items-center gap-1 mt-1">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          Cannot exceed issued qty
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Computed summary */}
+                  <div className="grid grid-cols-3 gap-2 mt-1 text-center">
+                    <div className="p-2.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold truncate">Issued</p>
+                      <p className="text-sm font-black text-foreground mt-0.5 font-mono">{returnIssuedQty || 0}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold truncate">Used</p>
+                      <p className="text-sm font-black text-amber-600 mt-0.5 font-mono">
+                        {Math.max(0, (returnIssuedQty || 0) - (returnReturnedQty || 0))}
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-background/80 border border-emerald-500/30 shadow-2xs bg-emerald-50/60 dark:bg-emerald-950/20">
+                      <p className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase font-bold truncate">Returned</p>
+                      <p className="text-sm font-black text-emerald-600 mt-0.5 font-mono">{returnReturnedQty || 0}</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    <span className="font-semibold text-foreground">{returnReturnedQty || 0} {consumableReturnItem.unit || 'pcs'}</span> will be added back to stock &rarr; New stock: <span className="font-semibold text-foreground">{consumableReturnItem.stock + (returnReturnedQty || 0)} {consumableReturnItem.unit || 'pcs'}</span>
+                  </p>
+                </div>
+
+                {/* Returned By */}
+                <div className="p-4 rounded-2xl border border-border/70 bg-card/60 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2 pb-1 border-b border-border/50">
+                    <Tag className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-xs font-bold text-foreground uppercase tracking-wider">Details</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">Returned By</Label>
+                    <Input
+                      placeholder="Name of person returning items..."
+                      value={returnRecipient}
+                      onChange={(e) => setReturnRecipient(e.target.value)}
+                      className="h-10 text-xs rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">Notes / Reason</Label>
+                    <Input
+                      placeholder="e.g. Leftover from Sunday service, event cancelled..."
+                      value={returnNotes}
+                      onChange={(e) => setReturnNotes(e.target.value)}
+                      className="h-10 text-xs rounded-xl border-border/70 bg-background focus:bg-background transition-all shadow-2xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 sm:p-5 border-t border-border/70 bg-card/95 backdrop-blur-md sticky bottom-0 z-10 flex items-center justify-end gap-2.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConsumableReturnItem(null)}
+                  className="rounded-xl text-xs h-9 px-4 font-semibold border-border/80 cursor-pointer hover:bg-muted/60 shrink-0"
+                  disabled={isRecordingReturn}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConsumableReturn}
+                  className="rounded-xl text-xs h-9 px-5 font-bold shadow-xs cursor-pointer gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                  disabled={
+                    isRecordingReturn ||
+                    returnIssuedQty <= 0 ||
+                    returnReturnedQty < 0 ||
+                    returnReturnedQty > returnIssuedQty
+                  }
+                >
+                  {isRecordingReturn ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  <span>Record Return (+{returnReturnedQty || 0} back)</span>
                 </Button>
               </div>
             </DialogContent>

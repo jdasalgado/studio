@@ -26,6 +26,13 @@ import {
   Save,
   LoaderCircle,
   Lock,
+  Wrench,
+  Upload,
+  Trash2,
+  CheckCircle,
+  Check,
+  AlertOctagon,
+  FileDown,
 } from 'lucide-react';
 import {
   Table,
@@ -72,6 +79,34 @@ import { ExportConfirmDialog } from '@/components/common/export-confirm-dialog';
 import { BorrowingQRModal } from './borrowing-qr-modal';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
+import { generateIncidentReportPDF, type IncidentReportData } from '@/lib/generate-incident-report';
+
+const CAMERA_EQUIPMENT_PRESETS = [
+  'Lens',
+  'Battery',
+  'SD Card',
+  'Tripod',
+  'Power Cord',
+  'Charger',
+  'Camera Bag',
+  'Microphone',
+];
+
+const getBorrowingInclusions = (b: any): string[] => {
+  if (!b) return [];
+  const checklist = b.checkoutChecklist;
+  if (checklist && typeof checklist === 'object' && Array.isArray((checklist as any).includedEquipment)) {
+    return (checklist as any).includedEquipment;
+  }
+  const notes = b.checkoutNotes || '';
+  if (notes.includes('Included Equipment:')) {
+    const match = notes.match(/Included Equipment:\s*([^\n|]+)/);
+    if (match && match[1]) {
+      return match[1].split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+};
 
 export function BorrowingsPanel() {
   const { borrowings, totalBorrowings, loading, fetchBorrowings, items, fetchItems } = useInventory();
@@ -95,15 +130,22 @@ export function BorrowingsPanel() {
   const [checkoutChecklist, setCheckoutChecklist] = useState<Record<string, boolean>>({});
   const [submittingCheckout, setSubmittingCheckout] = useState(false);
 
+  // Equipment & Accessories Inclusions State
+  const [checkoutIncludedEquipment, setCheckoutIncludedEquipment] = useState<string[]>([]);
+  const [customAccessoryInput, setCustomAccessoryInput] = useState('');
+
   // Return Modal State
   const [isReturnOpen, setIsReturnOpen] = useState(false);
   const [selectedBorrowing, setSelectedBorrowing] = useState<InventoryBorrowing | null>(null);
   const [returnCondition, setReturnCondition] = useState('Good Condition');
+  const [returnInclusions, setReturnInclusions] = useState<string[]>([]);
+  const [returnInclusionChecks, setReturnInclusionChecks] = useState<Record<string, boolean>>({});
   const [returnNotes, setReturnNotes] = useState('');
   const [returnChecklist, setReturnChecklist] = useState<Record<string, boolean>>({});
   const [submittingReturn, setSubmittingReturn] = useState(false);
   const [returnDamagePhoto, setReturnDamagePhoto] = useState<string | null>(null);
   const [isUploadingReturnPhoto, setIsUploadingReturnPhoto] = useState(false);
+  const [returnResolutionDeadline, setReturnResolutionDeadline] = useState('');
   const returnPhotoInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleReturnPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,22 +218,205 @@ export function BorrowingsPanel() {
   const [editReturnNotes, setEditReturnNotes] = useState('');
   const [editStatus, setEditStatus] = useState('RETURNED');
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [resolveEvidencePhoto, setResolveEvidencePhoto] = useState<string | null>(null);
+  const [isUploadingResolvePhoto, setIsUploadingResolvePhoto] = useState(false);
+  const [restoreMainStock, setRestoreMainStock] = useState(true);
+  const [resolveInclusionChecks, setResolveInclusionChecks] = useState<Record<string, boolean>>({});
+  const [editDueDate, setEditDueDate] = useState('');
+  const resolvePhotoInputRef = React.useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (detailsBorrowing) {
-      setEditReturnCondition(detailsBorrowing.returnCondition || 'Good Condition');
-      setEditReturnNotes(detailsBorrowing.returnNotes || '');
-      setEditStatus(detailsBorrowing.status || 'RETURNED');
-      setIsEditingDetails(false);
+  // Incident PDF Report
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  const handleDownloadIncidentReport = useCallback(async (b: InventoryBorrowing) => {
+    setIsGeneratingReport(true);
+    try {
+      const cond = (b.returnCondition || '').toLowerCase();
+      const isLost = cond.includes('lost') || cond.includes('nawala');
+      const isMissing = cond.includes('missing');
+      const incidentType: IncidentReportData['incidentType'] = isLost ? 'LOST' : isMissing ? 'MISSING' : 'DAMAGED';
+
+      const issuedAccessories = getBorrowingInclusions(b);
+      const retIncs: Record<string, boolean> = (b as any)?.returnChecklist?.returnedInclusions || {};
+      const missingItems: string[] = Array.isArray((b as any)?.returnChecklist?.missingItems)
+        ? (b as any).returnChecklist.missingItems
+        : [];
+      const missingAccessories = issuedAccessories.filter(
+        (acc) => retIncs[acc] === false || missingItems.includes(acc)
+      );
+
+      const reportData: IncidentReportData = {
+        reportId: `RPT-${b.id?.slice(-8).toUpperCase()}`,
+        reportDate: new Date().toISOString(),
+        reportedBy: workerProfile
+          ? `${workerProfile.firstName} ${workerProfile.lastName}`.trim()
+          : (user?.displayName || user?.email || 'Staff'),
+        itemName: b.item?.name || 'Unknown Item',
+        itemCode: b.item?.inventoryCode || undefined,
+        itemCategory: (b.item as any)?.category?.name || undefined,
+        borrowerName: b.borrowerName || 'Unknown',
+        borrowerEmail: b.borrowerEmail || undefined,
+        borrowerWorkerId: (b.borrower as any)?.workerId || undefined,
+        borrowedAt: b.borrowedAt ? String(b.borrowedAt) : undefined,
+        dueDate: b.dueDate ? String(b.dueDate) : undefined,
+        returnedAt: b.returnedAt ? String(b.returnedAt) : undefined,
+        borrowingId: b.id,
+        incidentType,
+        returnCondition: b.returnCondition || '—',
+        returnNotes: b.returnNotes || undefined,
+        damagePhotoUrl: (b as any)?.returnPhotos?.[0] || undefined,
+        issuedAccessories: issuedAccessories.length > 0 ? issuedAccessories : undefined,
+        returnedAccessories: issuedAccessories.length > 0 ? retIncs : undefined,
+        missingAccessories: missingAccessories.length > 0 ? missingAccessories : undefined,
+        resolutionDeadline: b.dueDate ? String(b.dueDate) : undefined,
+        resolutionStatus: b.status === 'RETURNED' ? 'Resolved' : 'Pending',
+        resolutionNotes: (b as any)?.resolutionNotes || undefined,
+        resolutionPhotoUrl: (b as any)?.resolutionPhoto || undefined,
+      };
+
+      await generateIncidentReportPDF(reportData);
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Report Generation Failed',
+        description: err?.message || 'Could not generate the incident report PDF.',
+      });
+    } finally {
+      setIsGeneratingReport(false);
     }
-  }, [detailsBorrowing]);
+  }, [workerProfile, user, toast]);
+
+  const isDamagedPendingRecord = useCallback((b: any) => {
+    if (!b) return false;
+    if (b.status === 'PENDING') return true;
+    const cond = (b.returnCondition || '').toLowerCase();
+    const isProblemCond = cond.includes('damag') || cond.includes('sira') || cond.includes('lost') || cond.includes('nawala') || cond.includes('missing');
+    return isProblemCond && !['resolved', 'repaired', 'replaced', 'naayos', 'napalitan'].some(k => cond.includes(k));
+  }, []);
+
+  const openDetailsModal = useCallback((b: InventoryBorrowing) => {
+    setDetailsBorrowing(b);
+    const cond = (b.returnCondition || '').toLowerCase();
+    const isLost = cond.includes('lost') || cond.includes('nawala');
+    setEditReturnCondition(
+      isDamagedPendingRecord(b)
+        ? (isLost ? 'Lost' : 'Damaged')
+        : b.returnCondition || 'Good Condition'
+    );
+    setEditStatus(b.status || (isDamagedPendingRecord(b) ? 'PENDING' : 'RETURNED'));
+    setEditReturnNotes(b.returnNotes || '');
+    setResolveEvidencePhoto(null);
+    setRestoreMainStock(true);
+    setEditDueDate(b.dueDate ? new Date(b.dueDate).toISOString().slice(0, 10) : '');
+
+    // Initialize missing accessories resolution checklist
+    const incs = getBorrowingInclusions(b);
+    const retIncs = (b as any)?.returnChecklist?.returnedInclusions || {};
+    const missingList = Array.isArray((b as any)?.returnChecklist?.missingItems) ? (b as any).returnChecklist.missingItems : [];
+    const initialResolved: Record<string, boolean> = {};
+    incs.forEach((item) => {
+      const isLostAcc = retIncs[item] === false || missingList.includes(item);
+      if (isLostAcc) {
+        initialResolved[item] = true;
+      }
+    });
+    setResolveInclusionChecks(initialResolved);
+    setIsEditingDetails(false);
+  }, [isDamagedPendingRecord]);
+
+  const openResolveModal = useCallback((b: InventoryBorrowing) => {
+    setDetailsBorrowing(b);
+    setEditReturnCondition('Resolved');
+    setEditStatus('RETURNED');
+    setEditReturnNotes(b.returnNotes ? `${b.returnNotes}\n[Resolved]: ` : '');
+    setResolveEvidencePhoto(null);
+    setRestoreMainStock(true);
+    setEditDueDate(b.dueDate ? new Date(b.dueDate).toISOString().slice(0, 10) : '');
+
+    const incs = getBorrowingInclusions(b);
+    const retIncs = (b as any)?.returnChecklist?.returnedInclusions || {};
+    const missingList = Array.isArray((b as any)?.returnChecklist?.missingItems) ? (b as any).returnChecklist.missingItems : [];
+    const initialResolved: Record<string, boolean> = {};
+    incs.forEach((item) => {
+      const isLostAcc = retIncs[item] === false || missingList.includes(item);
+      if (isLostAcc) {
+        initialResolved[item] = true;
+      }
+    });
+    setResolveInclusionChecks(initialResolved);
+    setIsEditingDetails(true);
+  }, []);
+
+  const handleResolvePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid File',
+        description: 'Please select a valid image file (PNG, JPG, WEBP).',
+      });
+      return;
+    }
+
+    setIsUploadingResolvePhoto(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.82);
+            setResolveEvidencePhoto(compressed);
+          } else {
+            setResolveEvidencePhoto(reader.result as string);
+          }
+          setIsUploadingResolvePhoto(false);
+        };
+        img.onerror = () => {
+          setResolveEvidencePhoto(reader.result as string);
+          setIsUploadingResolvePhoto(false);
+        };
+        img.src = reader.result;
+      }
+    };
+    reader.onerror = () => {
+      toast({
+        variant: 'destructive',
+        title: 'Read Failed',
+        description: 'Failed to read image file.',
+      });
+      setIsUploadingResolvePhoto(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleSaveDetails = async () => {
     if (!detailsBorrowing) return;
 
     const isReturned = detailsBorrowing.status === 'RETURNED';
+    const isPending = detailsBorrowing.status === 'PENDING';
     const cond = (detailsBorrowing.returnCondition || '').toLowerCase();
-    const isDamaged = cond.includes('damag') || cond.includes('repair') || cond.includes('replac') || cond.includes('sira') || cond.includes('ayos');
+    const isDamaged = isPending || cond.includes('damag') || cond.includes('repair') || cond.includes('replac') || cond.includes('sira') || cond.includes('ayos');
     if (isReturned && !isDamaged) {
       toast({
         variant: 'destructive',
@@ -199,6 +424,21 @@ export function BorrowingsPanel() {
         description: 'Returned equipment records cannot be edited unless marked as damaged.',
       });
       return;
+    }
+
+    const isResolving = ['resolved', 'repaired', 'replaced', 'good'].some(k => editReturnCondition.toLowerCase().includes(k));
+    const wasDamaged = isDamagedPendingRecord(detailsBorrowing);
+
+    // Require photo evidence when resolving a damaged item
+    if (wasDamaged && isResolving) {
+      if (!resolveEvidencePhoto) {
+        toast({
+          variant: 'destructive',
+          title: 'Evidence Photo Required',
+          description: 'Please upload or capture a photo proving that the item is repaired / replaced and in good condition before resolving.',
+        });
+        return;
+      }
     }
 
     setIsSavingDetails(true);
@@ -209,7 +449,11 @@ export function BorrowingsPanel() {
         body: JSON.stringify({
           returnCondition: editReturnCondition,
           returnNotes: editReturnNotes,
-          status: editStatus,
+          status: isResolving ? 'RETURNED' : editStatus,
+          resolutionPhoto: resolveEvidencePhoto || undefined,
+          restoreStock: restoreMainStock,
+          resolvedInclusions: resolveInclusionChecks,
+          dueDate: editDueDate || null,
         }),
       });
       if (!res.ok) {
@@ -218,10 +462,13 @@ export function BorrowingsPanel() {
       }
       const updated = await res.json();
       setDetailsBorrowing(updated);
+      setResolveEvidencePhoto(null);
       setIsEditingDetails(false);
       toast({
-        title: 'Record Updated',
-        description: 'Borrowing status, condition, and maintenance notes updated successfully.',
+        title: isResolving ? 'Equipment Resolved & Returned' : 'Record Updated',
+        description: isResolving
+          ? 'Equipment condition has been resolved with photo evidence, restored to available stock, and marked as RETURNED.'
+          : 'Borrowing status, condition, and maintenance notes updated successfully.',
       });
       loadData();
       fetchItems({ take: 200 });
@@ -247,18 +494,18 @@ export function BorrowingsPanel() {
       take: String(take),
       ...(statusFilter && { status: statusFilter }),
     });
-  }, [skip, take, statusFilter, fetchBorrowings]);
+    fetchItems({ take: 200 });
+  }, [skip, take, statusFilter, fetchBorrowings, fetchItems]);
 
   useEffect(() => {
     loadData();
-    fetchItems({ take: 200 });
 
     const handleRefreshEvent = () => {
       loadData();
     };
     window.addEventListener('inventory-refresh', handleRefreshEvent);
     return () => window.removeEventListener('inventory-refresh', handleRefreshEvent);
-  }, [loadData, fetchItems]);
+  }, [loadData]);
 
   useEffect(() => {
     fetch('/api/checklist-templates')
@@ -277,6 +524,9 @@ export function BorrowingsPanel() {
 
   const filteredBorrowings = useMemo(() => {
     return borrowings.filter((b) => {
+      if (statusFilter === 'BORROWED' && b.status !== 'BORROWED') return false;
+      if (statusFilter === 'PENDING' && !isDamagedPendingRecord(b)) return false;
+      if (statusFilter === 'RETURNED' && (b.status !== 'RETURNED' || isDamagedPendingRecord(b))) return false;
       if (!search.trim()) return true;
       const q = search.toLowerCase();
       return (
@@ -286,17 +536,18 @@ export function BorrowingsPanel() {
         (b.item?.inventoryCode || '').toLowerCase().includes(q)
       );
     });
-  }, [borrowings, search]);
+  }, [borrowings, search, statusFilter, isDamagedPendingRecord]);
 
   const stats = useMemo(() => {
     const active = borrowings.filter((b) => b.status === 'BORROWED').length;
-    const returned = borrowings.filter((b) => b.status === 'RETURNED').length;
+    const pending = borrowings.filter((b) => isDamagedPendingRecord(b)).length;
+    const returned = borrowings.filter((b) => b.status === 'RETURNED' && !isDamagedPendingRecord(b)).length;
     const overdue = borrowings.filter(
       (b) => b.status === 'BORROWED' && b.dueDate && new Date(b.dueDate) < new Date()
     ).length;
     const total = totalBorrowings || borrowings.length;
-    return { active, returned, overdue, total };
-  }, [borrowings, totalBorrowings]);
+    return { active, returned, overdue, pending, total };
+  }, [borrowings, totalBorrowings, isDamagedPendingRecord]);
 
   const checkoutTemplate = checklistTemplates.find((t) => t.type === 'checkout');
   const returnTemplate = checklistTemplates.find((t) => t.type === 'return');
@@ -342,6 +593,17 @@ export function BorrowingsPanel() {
 
     setSubmittingCheckout(true);
     try {
+      let finalCheckoutNotes = checkoutNotes.trim();
+      if (checkoutIncludedEquipment.length > 0) {
+        const inclStr = `Included Equipment: ${checkoutIncludedEquipment.join(', ')}`;
+        finalCheckoutNotes = finalCheckoutNotes ? `${finalCheckoutNotes} | ${inclStr}` : inclStr;
+      }
+
+      const finalChecklist = {
+        ...checkoutChecklist,
+        includedEquipment: checkoutIncludedEquipment,
+      };
+
       const res = await fetch('/api/borrowings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -350,9 +612,9 @@ export function BorrowingsPanel() {
           borrowerId: checkoutWorkerId,
           borrowerName: workerName,
           dueDate: checkoutDueDate || null,
-          checkoutNotes,
+          checkoutNotes: finalCheckoutNotes,
           checkoutCondition: 'Good Condition',
-          checkoutChecklist,
+          checkoutChecklist: finalChecklist,
         }),
       });
 
@@ -373,6 +635,8 @@ export function BorrowingsPanel() {
       setCheckoutNotes('');
       setCheckoutCondition('Good Condition');
       setCheckoutChecklist({});
+      setCheckoutIncludedEquipment([]);
+      setCustomAccessoryInput('');
       loadData();
     } catch (err: any) {
       toast({
@@ -397,6 +661,7 @@ export function BorrowingsPanel() {
       return;
     }
 
+    const isLostItem = returnCondition === 'Lost';
     const isDamagedItem = returnCondition === 'Damaged';
     if (isDamagedItem && !returnDamagePhoto) {
       toast({
@@ -407,7 +672,7 @@ export function BorrowingsPanel() {
       return;
     }
 
-    if (!isDamagedItem && !isReturnChecklistComplete) {
+    if (!isDamagedItem && !isLostItem && !isReturnChecklistComplete) {
       toast({
         variant: 'destructive',
         title: 'Checklist Required',
@@ -418,13 +683,20 @@ export function BorrowingsPanel() {
 
     setSubmittingReturn(true);
     try {
+      const finalReturnChecklist = {
+        ...returnChecklist,
+        returnedInclusions: returnInclusionChecks,
+        resolutionDeadline: returnResolutionDeadline || null,
+      };
+
       const res = await fetch(`/api/borrowings/${selectedBorrowing.id}/return`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           returnNotes,
           returnCondition,
-          returnChecklist,
+          returnChecklist: finalReturnChecklist,
+          resolutionDeadline: returnResolutionDeadline || null,
           damaged: isDamagedItem,
           returnPhotos: returnDamagePhoto ? [returnDamagePhoto] : [],
           actorId: workerProfile?.id || user?.id || null,
@@ -438,10 +710,21 @@ export function BorrowingsPanel() {
         throw new Error(err.error || 'Failed to process return');
       }
 
+      const missingCount = Object.values(returnInclusionChecks).filter((c) => !c).length;
       toast({
-        title: isDamagedItem ? '⚠️ Return Completed (Flagged Damaged)' : 'Return Completed',
-        description: isDamagedItem
-          ? `${selectedBorrowing.item?.name || 'Item'} returned with damage reported. Photo evidence recorded.`
+        title: isLostItem
+          ? '⚠️ Equipment Reported Lost'
+          : missingCount > 0
+          ? '⚠️ Return Recorded with Lost Gear'
+          : isDamagedItem
+          ? '⚠️ Item Damaged — Pending'
+          : 'Return Completed',
+        description: isLostItem
+          ? `${selectedBorrowing.item?.name || 'Item'} recorded as Lost. Stock will not be restored.`
+          : missingCount > 0
+          ? `${selectedBorrowing.item?.name || 'Item'} returned, but ${missingCount} accessory reported as lost/missing.`
+          : isDamagedItem
+          ? `${selectedBorrowing.item?.name || 'Item'} returned with damage reported. Marked as Pending until resolved.`
           : `${selectedBorrowing.item?.name || 'Item'} returned successfully.`,
       });
 
@@ -450,6 +733,9 @@ export function BorrowingsPanel() {
       setReturnNotes('');
       setReturnDamagePhoto(null);
       setReturnChecklist({});
+      setReturnInclusions([]);
+      setReturnInclusionChecks({});
+      setReturnResolutionDeadline('');
       loadData();
     } catch (err: any) {
       toast({
@@ -468,6 +754,17 @@ export function BorrowingsPanel() {
     setReturnNotes('');
     setReturnDamagePhoto(null);
     setReturnChecklist({});
+
+    const defaultDeadline = new Date();
+    defaultDeadline.setDate(defaultDeadline.getDate() + 7);
+    setReturnResolutionDeadline(defaultDeadline.toISOString().slice(0, 10));
+
+    const inclusions = getBorrowingInclusions(b);
+    setReturnInclusions(inclusions);
+    const initialChecks: Record<string, boolean> = {};
+    inclusions.forEach((acc) => { initialChecks[acc] = true; });
+    setReturnInclusionChecks(initialChecks);
+
     setIsReturnOpen(true);
   };
 
@@ -638,6 +935,9 @@ export function BorrowingsPanel() {
                   <SelectItem value="BORROWED" className="text-xs font-medium cursor-pointer">
                     Active Borrowed ({stats.active})
                   </SelectItem>
+                  <SelectItem value="PENDING" className="text-xs font-semibold cursor-pointer text-amber-600 dark:text-amber-400">
+                    Pending / Damaged ({stats.pending})
+                  </SelectItem>
                   <SelectItem value="RETURNED" className="text-xs font-medium cursor-pointer">
                     Returned ({stats.returned})
                   </SelectItem>
@@ -690,7 +990,9 @@ export function BorrowingsPanel() {
                 </div>
               ) : (
                 filteredBorrowings.map((b) => {
-                  const isOverdue = b.status === 'BORROWED' && b.dueDate && new Date(b.dueDate) < new Date();
+                  const isDamagedPending = isDamagedPendingRecord(b);
+                  const isPendingOverdue = isDamagedPending && Boolean(b.dueDate && new Date(b.dueDate) < new Date());
+                  const isOverdue = (b.status === 'BORROWED' && Boolean(b.dueDate && new Date(b.dueDate) < new Date())) || isPendingOverdue;
                   const dueInfo = getRelativeDueInfo(b.dueDate, b.status);
                   const codeDisplay = b.item?.inventoryCode || `BORROW-${b.id.slice(0, 6).toUpperCase()}`;
                   const borrowerInitials = b.borrowerName.trim().split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'BW';
@@ -709,28 +1011,50 @@ export function BorrowingsPanel() {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs",
-                              b.status === 'RETURNED'
-                                ? "bg-emerald-500/20 text-emerald-200 border-emerald-400/40"
-                                : isOverdue
-                                ? "bg-rose-500/25 text-rose-200 border-rose-400/40 animate-pulse"
-                                : "bg-amber-400/20 text-amber-200 border-amber-300/40"
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "w-1.5 h-1.5 rounded-full",
-                                b.status === 'RETURNED'
-                                  ? "bg-emerald-400"
-                                  : isOverdue
-                                  ? "bg-rose-400"
-                                  : "bg-amber-400"
-                              )}
-                            />
-                            <span>{b.status === 'RETURNED' ? 'Returned' : isOverdue ? 'Overdue' : 'Borrowed'}</span>
-                          </span>
+                          {(() => {
+                            const isDamagedPending = isDamagedPendingRecord(b);
+                            const isReturned = b.status === 'RETURNED' && !isDamagedPending;
+                            return (
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs",
+                                  isReturned
+                                    ? "bg-emerald-500/20 text-emerald-200 border-emerald-400/40"
+                                    : isDamagedPending
+                                    ? "bg-amber-500/25 text-amber-200 border-amber-400/50"
+                                    : isOverdue
+                                    ? "bg-rose-500/25 text-rose-200 border-rose-400/40 animate-pulse"
+                                    : "bg-sky-400/20 text-sky-200 border-sky-300/40"
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isReturned
+                                      ? "bg-emerald-400"
+                                      : isDamagedPending
+                                      ? "bg-amber-400 animate-pulse"
+                                      : isOverdue
+                                      ? "bg-rose-400"
+                                      : "bg-sky-400"
+                                  )}
+                                />
+                                <span>
+                                  {isReturned
+                                    ? 'Returned'
+                                    : isDamagedPending
+                                    ? (b.returnCondition?.toLowerCase().includes('lost')
+                                        ? 'Pending (Lost)'
+                                        : b.returnCondition?.toLowerCase().includes('missing')
+                                        ? 'Pending (Missing)'
+                                        : 'Pending (Damaged)')
+                                    : isOverdue
+                                    ? 'Overdue'
+                                    : 'Borrowed'}
+                                </span>
+                              </span>
+                            );
+                          })()}
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -742,13 +1066,21 @@ export function BorrowingsPanel() {
                                 <MoreHorizontal className="h-4 w-4" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44 rounded-xl shadow-lg border border-border bg-popover">
+                            <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-lg border border-border bg-popover">
                               <DropdownMenuItem
-                                onClick={() => setDetailsBorrowing(b)}
+                                onClick={() => openDetailsModal(b)}
                                 className="cursor-pointer text-xs font-medium"
                               >
                                 <Eye className="h-3.5 w-3.5 mr-2" /> Details
                               </DropdownMenuItem>
+                              {isDamagedPendingRecord(b) && (
+                                <DropdownMenuItem
+                                  onClick={() => openResolveModal(b)}
+                                  className="cursor-pointer text-xs font-bold text-amber-600 dark:text-amber-400 focus:text-amber-700"
+                                >
+                                  <Wrench className="h-3.5 w-3.5 mr-2 text-amber-600 dark:text-amber-400" /> Resolve
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => setQrBorrowing(b)}
                                 className="cursor-pointer text-xs font-medium"
@@ -778,6 +1110,22 @@ export function BorrowingsPanel() {
                           <p className="text-xs text-muted-foreground truncate">
                             {(b.item as any)?.category?.name || b.item?.status || 'Active Asset'} &bull; {(b as any).quantity || 1} {(b.item as any)?.unit || 'pcs'}
                           </p>
+                          {(() => {
+                            const inc = getBorrowingInclusions(b);
+                            if (inc.length === 0) return null;
+                            return (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {inc.map((item, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
+                                  >
+                                    +{item}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Borrower User Row */}
@@ -806,10 +1154,12 @@ export function BorrowingsPanel() {
 
                           <div className="space-y-0.5">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                              DUE SCHEDULE
+                              {isDamagedPending ? 'RESOLUTION DUE' : 'DUE SCHEDULE'}
                             </span>
-                            <span className={cn("font-bold text-xs block truncate", isOverdue ? "text-destructive" : "text-foreground")}>
-                              {dueInfo?.text || 'Open Schedule'}
+                            <span className={cn("font-bold text-xs block truncate", (isOverdue || isPendingOverdue) ? "text-destructive font-bold" : "text-foreground")}>
+                              {isDamagedPending && b.dueDate
+                                ? `${new Date(b.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}${isPendingOverdue ? ' (Overdue)' : ''}`
+                                : (dueInfo?.text || 'Open Schedule')}
                             </span>
                           </div>
 
@@ -817,8 +1167,13 @@ export function BorrowingsPanel() {
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
                               CONDITION
                             </span>
-                            <span className="font-bold text-foreground text-xs block truncate">
-                              {b.status === 'RETURNED' ? b.returnCondition || 'Returned' : b.checkoutCondition || 'Good Condition'}
+                            <span className={cn(
+                              "font-bold text-xs block truncate",
+                              isDamagedPendingRecord(b) ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-foreground"
+                            )}>
+                              {isDamagedPendingRecord(b)
+                                ? (b.returnCondition && !b.returnCondition.toLowerCase().includes('good') ? b.returnCondition : 'Damaged')
+                                : (b.returnCondition || b.checkoutCondition || 'Good Condition')}
                             </span>
                           </div>
 
@@ -835,14 +1190,14 @@ export function BorrowingsPanel() {
                         {/* Condition Notes Banner */}
                         {(b.checkoutNotes || b.returnNotes) && (
                           <div className="text-xs text-muted-foreground bg-muted/30 p-2.5 rounded-xl border border-border/50 leading-relaxed italic">
-                            "{b.status === 'RETURNED' ? b.returnNotes || 'No return notes' : b.checkoutNotes || 'Standard checkout'}"
+                            "{(b.status === 'RETURNED' || isDamagedPendingRecord(b)) ? b.returnNotes || 'Damaged return recorded' : b.checkoutNotes || 'Standard checkout'}"
                           </div>
                         )}
 
                         {b.returnPhotos && b.returnPhotos.length > 0 && (
                           <button
                             type="button"
-                            onClick={() => setDetailsBorrowing(b)}
+                            onClick={() => openDetailsModal(b)}
                             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-colors cursor-pointer w-fit"
                           >
                             <Camera className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -911,7 +1266,9 @@ export function BorrowingsPanel() {
                     </TableRow>
                   ) : (
                     filteredBorrowings.map((b) => {
-                      const isOverdue = b.status === 'BORROWED' && b.dueDate && new Date(b.dueDate) < new Date();
+                      const isDamagedPending = isDamagedPendingRecord(b);
+                      const isPendingOverdue = isDamagedPending && Boolean(b.dueDate && new Date(b.dueDate) < new Date());
+                      const isOverdue = (b.status === 'BORROWED' && Boolean(b.dueDate && new Date(b.dueDate) < new Date())) || isPendingOverdue;
                       const dueInfo = getRelativeDueInfo(b.dueDate, b.status);
 
                       return (
@@ -933,10 +1290,22 @@ export function BorrowingsPanel() {
                                 <div className="font-bold text-xs md:text-sm leading-tight text-foreground truncate max-w-[220px]">
                                   {b.item?.name}
                                 </div>
-                                <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   <span className="font-mono font-bold text-xs text-foreground">
                                     {b.item?.inventoryCode || b.itemId.slice(0, 8)}
                                   </span>
+                                  {(() => {
+                                    const inc = getBorrowingInclusions(b);
+                                    if (inc.length === 0) return null;
+                                    return (
+                                      <span
+                                        className="text-[10px] font-semibold px-1.5 py-0.2 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 truncate max-w-[150px]"
+                                        title={`Included Equipment: ${inc.join(', ')}`}
+                                      >
+                                        +{inc.length} gear ({inc.slice(0, 2).join(', ')}{inc.length > 2 ? '…' : ''})
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -969,7 +1338,22 @@ export function BorrowingsPanel() {
 
                           {/* 4. Returned Date */}
                           <TableCell className="py-3">
-                            {b.returnedAt ? (
+                            {isDamagedPending ? (
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                                  <Clock className={`h-3.5 w-3.5 shrink-0 ${isPendingOverdue ? 'text-destructive' : 'text-amber-600 dark:text-amber-400'}`} />
+                                  <span className={isPendingOverdue ? 'text-destructive font-bold' : ''}>
+                                    {b.dueDate ? new Date(b.dueDate).toLocaleDateString() : (b.returnedAt ? new Date(b.returnedAt).toLocaleDateString() : 'Pending')}
+                                  </span>
+                                </div>
+                                <span className={cn(
+                                  "text-[10px] font-bold block",
+                                  isPendingOverdue ? "text-destructive" : "text-amber-700 dark:text-amber-300"
+                                )}>
+                                  {isPendingOverdue ? 'Resolution Overdue' : 'Target Resolution'}
+                                </span>
+                              </div>
+                            ) : b.returnedAt ? (
                               <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                                 <span>{new Date(b.returnedAt).toLocaleDateString()}</span>
@@ -1009,45 +1393,87 @@ export function BorrowingsPanel() {
 
                           {/* 5. Status Badge */}
                           <TableCell className="py-3 whitespace-nowrap min-w-[130px]">
-                            <span
-                              className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border whitespace-nowrap shrink-0 ${
-                                b.status === 'RETURNED'
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                  : isOverdue
-                                  ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-200 dark:border-red-800 animate-pulse'
-                                  : 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200 dark:border-sky-800'
-                              }`}
-                            >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                  b.status === 'RETURNED'
-                                    ? 'bg-emerald-500'
-                                    : isOverdue
-                                    ? 'bg-red-500'
-                                    : 'bg-sky-500'
-                                }`}
-                              />
-                              <span className="whitespace-nowrap">{b.status === 'RETURNED' ? 'Returned' : isOverdue ? 'Overdue' : 'Active Borrowed'}</span>
-                            </span>
+                            {(() => {
+                              const isDamagedPending = isDamagedPendingRecord(b);
+                              const isReturned = b.status === 'RETURNED' && !isDamagedPending;
+
+                              return (
+                                <span
+                                  className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border whitespace-nowrap shrink-0 ${
+                                    isReturned
+                                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                      : isDamagedPending
+                                      ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-700 shadow-2xs'
+                                      : isOverdue
+                                      ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-200 dark:border-red-800 animate-pulse'
+                                      : 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200 dark:border-sky-800'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                      isReturned
+                                        ? 'bg-emerald-500'
+                                        : isDamagedPending
+                                        ? 'bg-amber-500 animate-pulse'
+                                        : isOverdue
+                                        ? 'bg-red-500'
+                                        : 'bg-sky-500'
+                                    }`}
+                                  />
+                                  <span className="whitespace-nowrap">
+                                    {isReturned
+                                      ? 'Returned'
+                                      : isDamagedPending
+                                      ? (b.returnCondition?.toLowerCase().includes('lost')
+                                          ? 'Pending (Lost)'
+                                          : b.returnCondition?.toLowerCase().includes('missing')
+                                          ? 'Pending (Missing)'
+                                          : 'Pending (Damaged)')
+                                      : isOverdue
+                                      ? 'Overdue'
+                                      : 'Active Borrowed'}
+                                  </span>
+                                </span>
+                              );
+                            })()}
                           </TableCell>
 
                           {/* 6. Condition Only */}
                           <TableCell className="py-3 text-xs text-foreground min-w-[140px]">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-xs font-semibold px-2.5 py-0.5 rounded-full border",
-                                (b.status === 'RETURNED' ? b.returnCondition : b.checkoutCondition)?.toLowerCase().includes('damage')
-                                  ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30"
-                                  : (b.status === 'RETURNED' ? b.returnCondition : b.checkoutCondition)?.toLowerCase().includes('wear')
-                                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                              )}
-                            >
-                              {b.status === 'RETURNED'
-                                ? b.returnCondition || 'Good Condition'
-                                : b.checkoutCondition || 'Good Condition'}
-                            </Badge>
+                            {(() => {
+                              const isDamagedPending = isDamagedPendingRecord(b);
+                              const cond = isDamagedPending
+                                ? (b.returnCondition && !b.returnCondition.toLowerCase().includes('good') ? b.returnCondition : 'Damaged')
+                                : (b.returnCondition || b.checkoutCondition || 'Good Condition');
+                              const condLower = cond.toLowerCase();
+                              const isLost = condLower.includes('lost') || condLower.includes('nawala');
+                              const isMissing = condLower.includes('missing');
+                              const isDamaged = condLower.includes('damag') || condLower.includes('sira');
+                              const isResolved = ['resolved', 'repaired', 'replaced', 'naayos', 'napalitan'].some(k => condLower.includes(k));
+                              const isWear = condLower.includes('wear');
+
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-xs font-semibold px-2.5 py-0.5 rounded-full border",
+                                    isLost
+                                      ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40 font-bold"
+                                      : isMissing
+                                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 font-bold"
+                                      : isDamaged
+                                      ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30"
+                                      : isResolved
+                                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
+                                      : isWear
+                                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                  )}
+                                >
+                                  {isResolved ? 'Resolved' : isLost ? 'Lost' : isMissing ? 'Missing Gear' : isDamaged ? 'Damaged' : cond}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
 
                           {/* 7. Actions */}
@@ -1061,14 +1487,24 @@ export function BorrowingsPanel() {
                                   <MoreHorizontal className="h-4 w-4" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40 p-1 rounded-xl shadow-lg border-border/80">
+                              <DropdownMenuContent align="end" className="w-52 p-1 rounded-xl shadow-lg border-border/80">
                                 <DropdownMenuItem
-                                  onClick={() => setDetailsBorrowing(b)}
+                                  onClick={() => openDetailsModal(b)}
                                   className="cursor-pointer gap-2 rounded-lg text-xs font-medium py-2"
                                 >
                                   <Eye className="h-3.5 w-3.5 text-muted-foreground" />
                                   View Details
                                 </DropdownMenuItem>
+
+                                {isDamagedPendingRecord(b) && (
+                                  <DropdownMenuItem
+                                    onClick={() => openResolveModal(b)}
+                                    className="cursor-pointer gap-2 rounded-lg text-xs font-semibold py-2 text-amber-600 dark:text-amber-400"
+                                  >
+                                    <Wrench className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                    Resolve
+                                  </DropdownMenuItem>
+                                )}
 
                                 <DropdownMenuItem
                                   onClick={() => setQrBorrowing(b)}
@@ -1338,6 +1774,122 @@ export function BorrowingsPanel() {
                 </div>
               )}
 
+              {/* Included Equipment & Accessories (Lens, Battery, SD Card, Tripod, Cord, Charger, etc.) */}
+              <div className="space-y-2.5 p-3.5 bg-muted/30 border border-border/70 rounded-2xl">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Package className="h-4 w-4 text-primary" />
+                    <span>Included Equipment &amp; Accessories</span>
+                  </Label>
+                  <span className="text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
+                    {checkoutIncludedEquipment.length} item{checkoutIncludedEquipment.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-tight">
+                  Tag accessories or extra gear issued with this item (e.g. for camera package):
+                </p>
+
+                {/* Quick Add Presets */}
+                <div className="space-y-1.5 pt-0.5">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                    Quick Select:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CAMERA_EQUIPMENT_PRESETS.map((preset) => {
+                      const isSelected = checkoutIncludedEquipment.includes(preset);
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setCheckoutIncludedEquipment(checkoutIncludedEquipment.filter((x) => x !== preset));
+                            } else {
+                              setCheckoutIncludedEquipment([...checkoutIncludedEquipment, preset]);
+                            }
+                          }}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 select-none",
+                            isSelected
+                              ? "bg-primary text-primary-foreground shadow-2xs font-bold"
+                              : "bg-background hover:bg-muted border border-border/70 text-foreground"
+                          )}
+                        >
+                          <span className="text-[11px]">{isSelected ? '✓' : '+'}</span>
+                          <span>{preset}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom equipment / accessory input */}
+                <div className="flex items-center gap-2 pt-1">
+                  <Input
+                    value={customAccessoryInput}
+                    onChange={(e) => setCustomAccessoryInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = customAccessoryInput.trim();
+                        if (val && !checkoutIncludedEquipment.includes(val)) {
+                          setCheckoutIncludedEquipment([...checkoutIncludedEquipment, val]);
+                          setCustomAccessoryInput('');
+                        }
+                      }
+                    }}
+                    placeholder="Add other gear (e.g. 50mm Lens, Ring Light, Case)..."
+                    className="h-8 text-xs rounded-xl bg-background border-border/70 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const val = customAccessoryInput.trim();
+                      if (val && !checkoutIncludedEquipment.includes(val)) {
+                        setCheckoutIncludedEquipment([...checkoutIncludedEquipment, val]);
+                        setCustomAccessoryInput('');
+                      }
+                    }}
+                    disabled={!customAccessoryInput.trim()}
+                    className="h-8 px-3 text-xs font-semibold rounded-xl cursor-pointer shrink-0"
+                  >
+                    + Add
+                  </Button>
+                </div>
+
+                {/* Selected Inclusions Badges */}
+                {checkoutIncludedEquipment.length > 0 && (
+                  <div className="pt-2 border-t border-border/50 space-y-1.5">
+                    <span className="text-[10px] font-bold text-foreground uppercase tracking-wider block">
+                      Equipment to be Issued:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {checkoutIncludedEquipment.map((item) => (
+                        <span
+                          key={item}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/25 shadow-2xs"
+                        >
+                          <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />
+                          <span>{item}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCheckoutIncludedEquipment(checkoutIncludedEquipment.filter((x) => x !== item))
+                            }
+                            className="hover:bg-primary/20 rounded p-0.5 ml-0.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                            title="Remove"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Purpose / Notes */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-foreground">Notes / Purpose</Label>
@@ -1445,17 +1997,37 @@ export function BorrowingsPanel() {
                     <select
                       className="flex h-10 w-full appearance-none rounded-xl border border-input bg-background pl-3.5 pr-10 py-2 text-xs shadow-2xs focus:outline-none focus:ring-1 focus:ring-ring font-medium text-foreground cursor-pointer transition-colors"
                       value={returnCondition}
-                      onChange={(e) => setReturnCondition(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setReturnCondition(val);
+                        if (val === 'Damaged' || val === 'Lost') {
+                          setReturnChecklist({});
+                        }
+                      }}
                     >
                       <option value="Good Condition">Good Condition (No issues)</option>
                       <option value="Minor Wear">Minor Wear (Functional)</option>
                       <option value="Damaged">Damaged / Needs Maintenance</option>
+                      <option value="Lost">Lost / Missing Equipment</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-muted-foreground">
                       <ChevronDown className="h-4 w-4" />
                     </div>
                   </div>
                 </div>
+
+                {/* Lost Warning Banner */}
+                {returnCondition === 'Lost' && (
+                  <div className="p-3.5 rounded-2xl bg-destructive/10 border border-destructive/30 text-destructive text-xs space-y-1 animate-in fade-in">
+                    <div className="flex items-center gap-2 font-bold text-destructive">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+                      <span>Equipment Declared Lost</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      This item will be recorded as <strong className="text-destructive">Lost (Pending Resolution)</strong>. Available inventory stock will <span className="text-destructive font-bold underline">NOT</span> be restored until the equipment is replaced or resolved.
+                    </p>
+                  </div>
+                )}
 
                 {/* Photo Upload Section: Damaged (Required), Minor Wear (Optional), Good Condition (Hidden) */}
                 {(returnCondition === 'Damaged' || returnCondition === 'Minor Wear') && (
@@ -1583,19 +2155,17 @@ export function BorrowingsPanel() {
                   </div>
                 )}
 
-                {/* Return Checklist */}
-                {returnTemplateItems.length > 0 && (
-                  <div className="space-y-2 p-3 bg-muted/30 border border-border/70 rounded-xl">
+                {/* Return Checklist: only applicable for normal returns; hidden when damaged or lost */}
+                {returnCondition !== 'Damaged' && returnCondition !== 'Lost' && returnTemplateItems.length > 0 && (
+                  <div className="space-y-2 p-3 bg-muted/30 border border-border/70 rounded-xl animate-in fade-in duration-150">
                     <div className="flex items-center justify-between">
                       <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                         <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                         Return Inspection Checklist
                       </Label>
-                      {returnCondition !== 'Damaged' && (
-                        <span className="text-[10px] text-destructive font-bold uppercase tracking-wider bg-destructive/10 px-2 py-0.5 rounded-md">
-                          Required *
-                        </span>
-                      )}
+                      <span className="text-[10px] text-destructive font-bold uppercase tracking-wider bg-destructive/10 px-2 py-0.5 rounded-md">
+                        Required *
+                      </span>
                     </div>
                     <div className="space-y-1.5 pt-1">
                       {returnTemplateItems.map((item: any) => (
@@ -1613,14 +2183,206 @@ export function BorrowingsPanel() {
                   </div>
                 )}
 
+                {/* Issued Inclusions Verification (Mark returned vs Lost) */}
+                {returnInclusions.length > 0 && (
+                  <div className="space-y-2.5 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                        <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <span>Issued Equipment Return Verification</span>
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allRet: Record<string, boolean> = {};
+                            returnInclusions.forEach((acc) => { allRet[acc] = true; });
+                            setReturnInclusionChecks(allRet);
+                          }}
+                          className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+                        >
+                          All Returned
+                        </button>
+                        <span className="text-muted-foreground text-[10px]">&bull;</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allLost: Record<string, boolean> = {};
+                            returnInclusions.forEach((acc) => { allLost[acc] = false; });
+                            setReturnInclusionChecks(allLost);
+                          }}
+                          className="text-[10px] font-bold text-destructive hover:underline cursor-pointer"
+                        >
+                          All Lost
+                        </button>
+                      </div>
+                    </div>
+                    {returnCondition === 'Lost' && (
+                      <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/25 text-destructive text-[11px] font-medium flex items-center gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        <span>Main unit is reported Lost. Verify which accessories were returned vs lost below:</span>
+                      </div>
+                    )}
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                      Check each item that is returned. Uncheck any accessory that is <strong>LOST or MISSING</strong>:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      {returnInclusions.map((item) => {
+                        const isChecked = returnInclusionChecks[item] ?? true;
+                        return (
+                          <div
+                            key={item}
+                            onClick={() =>
+                              setReturnInclusionChecks({ ...returnInclusionChecks, [item]: !isChecked })
+                            }
+                            className={cn(
+                              "flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer select-none transition-all",
+                              isChecked
+                                ? "bg-background border-border/80 text-foreground hover:bg-muted/30"
+                                : "bg-destructive/10 border-destructive/40 text-destructive font-semibold shadow-xs"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={(c) =>
+                                  setReturnInclusionChecks({ ...returnInclusionChecks, [item]: Boolean(c) })
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="font-semibold truncate">{item}</span>
+                            </div>
+                            <span
+                              className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0",
+                                isChecked
+                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                  : "bg-destructive/20 text-destructive font-extrabold"
+                              )}
+                            >
+                              {isChecked ? '✓ Returned' : '✕ Lost'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {Object.values(returnInclusionChecks).some((c) => !c) && (
+                      <div className="text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-2 font-medium flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        <span>Unchecked accessories will be recorded as <strong>Lost</strong> on this borrowing record.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Target Replacement / Resolution Deadline Date (for Damaged / Lost / Missing Gear) */}
+                {(returnCondition === 'Damaged' || returnCondition === 'Lost' || Object.values(returnInclusionChecks).some((c) => !c)) && (
+                  <div className="space-y-2 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                        <Calendar className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <span>
+                          {returnCondition === 'Lost'
+                            ? 'Target Replacement Deadline'
+                            : returnCondition === 'Damaged'
+                            ? 'Target Repair / Replacement Date'
+                            : 'Missing Accessories Return Deadline'}
+                        </span>
+                      </Label>
+                      {returnResolutionDeadline && (
+                        <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-md">
+                          Due: {new Date(returnResolutionDeadline).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                      Kailan dapat maibalik, mapalitan, o maayos ang {returnCondition === 'Lost' ? 'nawalang gamit' : returnCondition === 'Damaged' ? 'nasirang kagamitan' : 'nawalang accessories'} ng borrower.
+                    </p>
+                    <DatePicker
+                      value={returnResolutionDeadline}
+                      onChange={(date) => setReturnResolutionDeadline(date)}
+                      placeholder="dd/mm/yyyy"
+                      className="w-full h-9 text-xs rounded-xl bg-background"
+                      align="start"
+                    />
+                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 3);
+                          setReturnResolutionDeadline(d.toISOString().slice(0, 10));
+                        }}
+                        className="text-[11px] px-2 py-0.5 rounded-lg border border-border/70 bg-background hover:bg-muted text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+                      >
+                        +3 Days
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 7);
+                          setReturnResolutionDeadline(d.toISOString().slice(0, 10));
+                        }}
+                        className="text-[11px] px-2 py-0.5 rounded-lg border border-border/70 bg-background hover:bg-muted text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+                      >
+                        +1 Week
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 14);
+                          setReturnResolutionDeadline(d.toISOString().slice(0, 10));
+                        }}
+                        className="text-[11px] px-2 py-0.5 rounded-lg border border-border/70 bg-background hover:bg-muted text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+                      >
+                        +2 Weeks
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setMonth(d.getMonth() + 1);
+                          setReturnResolutionDeadline(d.toISOString().slice(0, 10));
+                        }}
+                        className="text-[11px] px-2 py-0.5 rounded-lg border border-border/70 bg-background hover:bg-muted text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+                      >
+                        +1 Month
+                      </button>
+                      {returnResolutionDeadline && (
+                        <button
+                          type="button"
+                          onClick={() => setReturnResolutionDeadline('')}
+                          className="text-[11px] px-2 py-0.5 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-medium transition-colors cursor-pointer ml-auto"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Notes */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-foreground">Inspection Notes</Label>
+                  <Label className="text-xs font-bold text-foreground">
+                    {returnCondition === 'Lost'
+                      ? 'Loss Incident Notes / Circumstances'
+                      : returnCondition === 'Damaged'
+                      ? 'Damage & Maintenance Notes'
+                      : 'Inspection Notes'}
+                  </Label>
                   <Input
                     value={returnNotes}
                     maxLength={500}
                     onChange={(e) => setReturnNotes(e.target.value)}
-                    placeholder="e.g. Returned clean, fully functional, battery at 90%"
+                    placeholder={
+                      returnCondition === 'Lost'
+                        ? 'Explain how the item was lost, last known location, incident report details...'
+                        : returnCondition === 'Damaged'
+                        ? 'Describe the damage, defect, or maintenance required...'
+                        : 'e.g. Returned clean, fully functional, battery at 90%'
+                    }
                     className="h-9 text-xs rounded-xl"
                   />
                 </div>
@@ -1637,33 +2399,49 @@ export function BorrowingsPanel() {
                   >
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={
-                      submittingReturn ||
-                      (returnCondition === 'Damaged' ? !returnDamagePhoto : !isReturnChecklistComplete)
-                    }
-                    className={cn(
-                      "min-h-[2.25rem] sm:min-h-[2.5rem] h-9 sm:h-10 px-4 sm:px-5 text-xs sm:text-sm font-bold rounded-xl shadow-xs cursor-pointer flex-1 sm:flex-initial",
-                      returnCondition === 'Damaged'
-                        ? (!returnDamagePhoto
-                            ? "bg-amber-600/60 hover:bg-amber-600/60 text-white cursor-not-allowed opacity-80"
-                            : "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20")
-                        : (!isReturnChecklistComplete
-                            ? "bg-emerald-600/60 hover:bg-emerald-600/60 text-white cursor-not-allowed opacity-80"
-                            : "bg-emerald-600 hover:bg-emerald-700 text-white")
-                    )}
-                  >
-                    {submittingReturn
-                      ? 'Processing Return...'
-                      : returnCondition === 'Damaged'
-                      ? (!returnDamagePhoto
-                          ? 'Photo Required'
-                          : 'Flag as Damaged')
-                      : (!isReturnChecklistComplete
-                          ? 'Checklist Required'
-                          : 'Complete Return')}
-                  </Button>
+                  {(() => {
+                    const isLost = returnCondition === 'Lost';
+                    const isDamaged = returnCondition === 'Damaged';
+                    const hasLostAccessories = Object.values(returnInclusionChecks).some((c) => !c);
+
+                    return (
+                      <Button
+                        type="submit"
+                        disabled={
+                          submittingReturn ||
+                          (isDamaged ? !returnDamagePhoto : isLost ? false : !isReturnChecklistComplete)
+                        }
+                        className={cn(
+                          "min-h-[2.25rem] sm:min-h-[2.5rem] h-9 sm:h-10 px-4 sm:px-5 text-xs sm:text-sm font-bold rounded-xl shadow-xs cursor-pointer flex-1 sm:flex-initial transition-all",
+                          isLost
+                            ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20"
+                            : isDamaged
+                            ? (!returnDamagePhoto
+                                ? "bg-amber-600/60 hover:bg-amber-600/60 text-white cursor-not-allowed opacity-80"
+                                : "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20")
+                            : (!isReturnChecklistComplete
+                                ? "bg-emerald-600/60 hover:bg-emerald-600/60 text-white cursor-not-allowed opacity-80"
+                                : hasLostAccessories
+                                ? "bg-amber-600 hover:bg-amber-700 text-white"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white")
+                        )}
+                      >
+                        {submittingReturn
+                          ? 'Processing...'
+                          : isLost
+                          ? 'Report as Lost Equipment'
+                          : isDamaged
+                          ? (!returnDamagePhoto
+                              ? 'Photo Required'
+                              : 'Flag as Damaged')
+                          : (!isReturnChecklistComplete
+                              ? 'Checklist Required'
+                              : hasLostAccessories
+                              ? 'Complete Return (with Lost Gear)'
+                              : 'Complete Return')}
+                      </Button>
+                    );
+                  })()}
                 </DialogFooter>
               </form>
             )}
@@ -1672,7 +2450,7 @@ export function BorrowingsPanel() {
 
         {/* ── RECORD DETAILS MODAL ── */}
         <Dialog open={Boolean(detailsBorrowing)} onOpenChange={(open) => !open && setDetailsBorrowing(null)}>
-          <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-md max-h-[92dvh] sm:max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl md:rounded-3xl border-border/80 shadow-2xl gap-0 bg-background [&>button:last-child]:hidden">
+          <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl md:rounded-3xl border-border/80 shadow-2xl gap-0 bg-background [&>button:last-child]:hidden">
             {/* ── STICKY MODAL HEADER ── */}
             <DialogHeader className="p-4 sm:p-5 pb-3 sm:pb-4 border-b border-border/70 bg-card shrink-0 text-left space-y-0 w-full min-w-0">
               <div className="flex items-start justify-between gap-2.5 w-full min-w-0">
@@ -1741,16 +2519,46 @@ export function BorrowingsPanel() {
                       Status
                     </span>
                     <div className="mt-1">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] font-bold ${
-                          detailsBorrowing.status === 'RETURNED'
-                            ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
-                            : 'bg-sky-500/10 text-sky-700 border-sky-500/30'
-                        }`}
-                      >
-                        {detailsBorrowing.status}
-                      </Badge>
+                      {(() => {
+                        const isPending = isDamagedPendingRecord(detailsBorrowing);
+                        const cond = (detailsBorrowing.returnCondition || '').toLowerCase();
+                        const isLost = cond.includes('lost') || cond.includes('nawala');
+                        const isMissing = cond.includes('missing') || (detailsBorrowing.returnChecklist?.missingItems && detailsBorrowing.returnChecklist.missingItems.length > 0);
+
+                        if (isPending) {
+                          if (isLost) {
+                            return (
+                              <Badge variant="outline" className="text-[10px] font-bold bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/40">
+                                PENDING (LOST)
+                              </Badge>
+                            );
+                          }
+                          if (isMissing) {
+                            return (
+                              <Badge variant="outline" className="text-[10px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/40">
+                                PENDING (MISSING GEAR)
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30">
+                              PENDING (DAMAGED)
+                            </Badge>
+                          );
+                        }
+                        if (detailsBorrowing.status === 'RETURNED') {
+                          return (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                              RETURNED
+                            </Badge>
+                          );
+                        }
+                        return (
+                          <Badge variant="outline" className="text-[10px] font-bold bg-sky-500/10 text-sky-700 border-sky-500/30">
+                            {detailsBorrowing.status}
+                          </Badge>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1765,10 +2573,17 @@ export function BorrowingsPanel() {
 
                   <div className="p-3 rounded-xl bg-muted/20 border border-border/50">
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                      Returned Date
+                      {isDamagedPendingRecord(detailsBorrowing) ? 'Target Resolution Due' : 'Returned Date'}
                     </span>
-                    <span className="font-bold text-foreground mt-0.5 block">
-                      {detailsBorrowing.returnedAt
+                    <span className={cn(
+                      "font-bold text-foreground mt-0.5 block",
+                      isDamagedPendingRecord(detailsBorrowing) && detailsBorrowing.dueDate && new Date(detailsBorrowing.dueDate) < new Date()
+                        ? "text-destructive font-bold"
+                        : ""
+                    )}>
+                      {isDamagedPendingRecord(detailsBorrowing) && detailsBorrowing.dueDate
+                        ? new Date(detailsBorrowing.dueDate).toLocaleDateString()
+                        : detailsBorrowing.returnedAt
                         ? new Date(detailsBorrowing.returnedAt).toLocaleDateString()
                         : detailsBorrowing.status === 'RETURNED'
                         ? 'Returned'
@@ -1789,7 +2604,7 @@ export function BorrowingsPanel() {
                       (() => {
                         const isReturned = detailsBorrowing.status === 'RETURNED';
                         const cond = (detailsBorrowing.returnCondition || '').toLowerCase();
-                        const isDamaged = cond.includes('damag') || cond.includes('repair') || cond.includes('replac') || cond.includes('sira') || cond.includes('ayos');
+                        const isDamaged = isDamagedPendingRecord(detailsBorrowing) || cond.includes('damag') || cond.includes('repair') || cond.includes('replac') || cond.includes('sira') || cond.includes('ayos');
                         const canEdit = !isReturned || isDamaged;
 
                         return canEdit ? (
@@ -1816,15 +2631,25 @@ export function BorrowingsPanel() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                           <Label className="text-xs font-semibold">Equipment Condition</Label>
-                          <Select value={editReturnCondition} onValueChange={setEditReturnCondition}>
+                          <Select
+                            value={editReturnCondition}
+                            onValueChange={(val) => {
+                              setEditReturnCondition(val);
+                              if (val === 'Resolved' || val === 'Repaired' || val === 'Replaced' || val === 'Good Condition') {
+                                setEditStatus('RETURNED');
+                              } else if (val === 'Damaged' || val === 'Under Repair' || val === 'Lost') {
+                                setEditStatus('PENDING');
+                              }
+                            }}
+                          >
                             <SelectTrigger className="h-9 text-xs rounded-xl bg-background">
                               <SelectValue placeholder="Select condition" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Good Condition" className="text-xs font-medium">Good Condition</SelectItem>
                               <SelectItem value="Damaged" className="text-xs text-destructive font-semibold">Damaged</SelectItem>
-                              <SelectItem value="Repaired" className="text-xs text-emerald-600 font-semibold">Repaired</SelectItem>
-                              <SelectItem value="Replaced" className="text-xs text-blue-600 font-semibold">Replaced</SelectItem>
+                              <SelectItem value="Lost" className="text-xs text-rose-600 font-semibold">Lost / Missing</SelectItem>
+                              <SelectItem value="Resolved" className="text-xs text-emerald-600 font-semibold">Resolved (Repaired / Replaced)</SelectItem>
                               <SelectItem value="Under Repair" className="text-xs text-amber-600 font-semibold">Under Repair / Maintenance</SelectItem>
                             </SelectContent>
                           </Select>
@@ -1837,12 +2662,133 @@ export function BorrowingsPanel() {
                               <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="RETURNED" className="text-xs font-medium">RETURNED</SelectItem>
+                              <SelectItem value="RETURNED" className="text-xs font-medium text-emerald-600 font-semibold">RETURNED (Resolved &amp; Restored)</SelectItem>
+                              <SelectItem value="PENDING" className="text-xs font-medium text-amber-600 font-semibold">PENDING (Damaged / Lost / Needs Action)</SelectItem>
                               <SelectItem value="BORROWED" className="text-xs font-medium">BORROWED</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
+
+                      {/* Target Resolution / Replacement Date (when pending resolution) */}
+                      {(editStatus === 'PENDING' || isDamagedPendingRecord(detailsBorrowing) || editReturnCondition === 'Damaged' || editReturnCondition === 'Lost') && (
+                        <div className="space-y-1.5 p-3 rounded-xl bg-muted/30 border border-border/60">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold flex items-center gap-1.5">
+                              <Calendar className="h-3.5 w-3.5 text-primary" /> Target Resolution / Replacement Deadline
+                            </Label>
+                            {editDueDate && (
+                              <span className="text-[10px] text-muted-foreground font-semibold">
+                                {new Date(editDueDate).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                          <DatePicker
+                            value={editDueDate}
+                            onChange={(date) => setEditDueDate(date)}
+                            placeholder="dd/mm/yyyy"
+                            className="w-full h-9 text-xs rounded-xl bg-background"
+                            align="start"
+                          />
+                        </div>
+                      )}
+
+                      {/* Lost Main Equipment Settlement (when editing/resolving) */}
+                      {((detailsBorrowing.returnCondition || '').toLowerCase().includes('lost') || editReturnCondition === 'Lost') && (
+                        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                              <AlertOctagon className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                              Lost Equipment Settlement
+                            </span>
+                            <Badge variant="outline" className="text-[10px] bg-rose-500/20 text-rose-800 dark:text-rose-300 border-rose-500/40 font-bold">
+                              Declared Lost
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Main unit <strong>{detailsBorrowing.item?.name}</strong> was marked as Lost. Check the box below if the item is recovered or physically replaced:
+                          </p>
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-background border border-border/70 cursor-pointer hover:bg-muted/30 transition-colors">
+                            <Checkbox
+                              checked={restoreMainStock}
+                              onCheckedChange={(c) => setRestoreMainStock(Boolean(c))}
+                              className="mt-0.5"
+                            />
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-bold text-foreground block">
+                                Restore 1 unit to available inventory stock
+                              </span>
+                              <span className="text-[10px] text-muted-foreground block">
+                                1 unit of this equipment will be restored to available stock and logged in the inventory audit history.
+                              </span>
+                            </div>
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Lost / Missing Accessories Resolution Checklist */}
+                      {(() => {
+                        const incs = getBorrowingInclusions(detailsBorrowing);
+                        const retIncs = detailsBorrowing.returnChecklist?.returnedInclusions || {};
+                        const missingList: string[] = Array.isArray(detailsBorrowing.returnChecklist?.missingItems)
+                          ? detailsBorrowing.returnChecklist.missingItems
+                          : [];
+                        const missingAccs = incs.filter((item) => retIncs[item] === false || missingList.includes(item));
+                        if (missingAccs.length === 0) return null;
+
+                        return (
+                          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                                <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                Missing Accessories Resolution
+                              </span>
+                              <span className="text-[10px] font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md">
+                                {Object.values(resolveInclusionChecks).filter(Boolean).length} / {missingAccs.length} Resolved
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-tight">
+                              Check off each accessory that has been recovered, found, or replaced:
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                              {missingAccs.map((item) => {
+                                const isResolved = resolveInclusionChecks[item] ?? false;
+                                return (
+                                  <label
+                                    key={item}
+                                    className={cn(
+                                      "flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer select-none transition-all",
+                                      isResolved
+                                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200 font-semibold"
+                                        : "bg-background border-border/80 text-foreground hover:bg-muted/30"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      <Checkbox
+                                        checked={isResolved}
+                                        onCheckedChange={(c) =>
+                                          setResolveInclusionChecks({ ...resolveInclusionChecks, [item]: Boolean(c) })
+                                        }
+                                      />
+                                      <span className="truncate">{item}</span>
+                                    </div>
+                                    <span
+                                      className={cn(
+                                        "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0",
+                                        isResolved
+                                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                          : "bg-rose-500/15 text-rose-700 dark:text-rose-400"
+                                      )}
+                                    >
+                                      {isResolved ? '✓ Replaced' : '✕ Missing'}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold">Maintenance / Replacement Notes</Label>
@@ -1850,10 +2796,115 @@ export function BorrowingsPanel() {
                           value={editReturnNotes}
                           maxLength={1000}
                           onChange={(e) => setEditReturnNotes(e.target.value)}
-                          placeholder="Describe any parts that were damaged, repaired, or replaced (e.g., Replaced camera lens, repaired charging port)..."
+                          placeholder="Describe any maintenance or replacement details (e.g., Replaced camera lens, repaired charging port)..."
                           className="text-xs rounded-xl min-h-[75px] bg-background resize-none leading-relaxed"
                         />
                       </div>
+
+                      {/* Initial Damage Evidence (Reference) if available */}
+                      {detailsBorrowing.returnPhotos && detailsBorrowing.returnPhotos.length > 0 && (
+                        <div className="p-2.5 rounded-xl bg-destructive/5 border border-destructive/20 space-y-1.5">
+                          <span className="text-[10px] font-bold text-destructive uppercase tracking-wider flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> Initial Damage Photo Evidence (Reference):
+                          </span>
+                          <div className="flex gap-2 overflow-x-auto py-0.5">
+                            {detailsBorrowing.returnPhotos.map((photo: string, idx: number) => (
+                              <a
+                                key={idx}
+                                href={photo}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="w-20 h-14 rounded-lg overflow-hidden border border-border/70 shrink-0 block hover:opacity-90 transition-opacity"
+                              >
+                                <img src={photo} alt={`Damage photo ${idx + 1}`} className="w-full h-full object-cover" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Evidence Photo Upload (Mandatory for Resolution) */}
+                      {(editReturnCondition === 'Resolved' || editReturnCondition === 'Repaired' || editReturnCondition === 'Replaced' || isDamagedPendingRecord(detailsBorrowing)) && (
+                        <div className={cn(
+                          "space-y-2 p-3 rounded-xl border transition-colors",
+                          resolveEvidencePhoto
+                            ? "bg-emerald-500/5 border-emerald-500/30"
+                            : editReturnCondition === 'Resolved'
+                            ? "bg-amber-500/10 border-amber-500/30"
+                            : "bg-muted/30 border-border/60"
+                        )}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 font-bold text-xs text-foreground">
+                              <Camera className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              <span>Evidence Photo (Restored / Okay Condition)</span>
+                              {editReturnCondition === 'Resolved' && <span className="text-destructive font-bold">*</span>}
+                            </div>
+                            {resolveEvidencePhoto && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setResolveEvidencePhoto(null)}
+                                className="h-6 px-2 text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Remove
+                              </Button>
+                            )}
+                          </div>
+
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Upload or capture a photo proving that the item is repaired / replaced and in good working condition.
+                          </p>
+
+                          <input
+                            ref={resolvePhotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleResolvePhotoSelect}
+                            className="hidden"
+                          />
+
+                          {resolveEvidencePhoto ? (
+                            <div className="relative aspect-video max-h-48 rounded-xl overflow-hidden border border-emerald-500/40 bg-black/5">
+                              <img
+                                src={resolveEvidencePhoto}
+                                alt="Resolution evidence preview"
+                                className="w-full h-full object-contain bg-black/10"
+                              />
+                              <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" /> Photo Attached
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              onClick={() => resolvePhotoInputRef.current?.click()}
+                              className={cn(
+                                "border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group",
+                                editReturnCondition === 'Resolved'
+                                  ? "border-amber-500/50 hover:border-emerald-500 bg-amber-500/5 hover:bg-emerald-500/10"
+                                  : "border-border hover:border-primary/50 bg-background hover:bg-muted/30"
+                              )}
+                            >
+                              <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                                {isUploadingResolvePhoto ? (
+                                  <LoaderCircle className="h-5 w-5 animate-spin" />
+                                ) : (
+                                  <Upload className="h-5 w-5" />
+                                )}
+                              </div>
+                              <div className="space-y-0.5">
+                                <p className="text-xs font-bold text-foreground">
+                                  {isUploadingResolvePhoto ? 'Compressing photo…' : 'Take or Upload Evidence Photo'}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  PNG, JPG, or WEBP (captured camera photo or image file)
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-xs space-y-2">
@@ -1865,22 +2916,173 @@ export function BorrowingsPanel() {
                           <strong>Checkout Notes:</strong> {detailsBorrowing.checkoutNotes}
                         </p>
                       )}
-                      {detailsBorrowing.status === 'RETURNED' && (
+                      {(() => {
+                        const inc = getBorrowingInclusions(detailsBorrowing);
+                        if (inc.length === 0) return null;
+                        const isProcessed = detailsBorrowing.status === 'RETURNED' || isDamagedPendingRecord(detailsBorrowing);
+                        const returnedIncs = detailsBorrowing.returnChecklist?.returnedInclusions;
+                        const missingList: string[] = Array.isArray(detailsBorrowing.returnChecklist?.missingItems)
+                          ? detailsBorrowing.returnChecklist.missingItems
+                          : [];
+
+                        const lostAccs: string[] = [];
+                        const returnedAccs: string[] = [];
+
+                        inc.forEach((item) => {
+                          if (isProcessed) {
+                            if (returnedIncs && typeof returnedIncs === 'object') {
+                              if (returnedIncs[item] === false) {
+                                lostAccs.push(item);
+                              } else {
+                                returnedAccs.push(item);
+                              }
+                            } else if (missingList.includes(item)) {
+                              lostAccs.push(item);
+                            } else {
+                              returnedAccs.push(item);
+                            }
+                          }
+                        });
+
+                        return (
+                          <div className="space-y-2 pt-1">
+                            <strong className="block text-[11px] uppercase tracking-wider text-muted-foreground">
+                              Included Equipment &amp; Accessories:
+                            </strong>
+                            <div className="flex flex-wrap gap-1.5">
+                              {inc.map((item, idx) => {
+                                const isLost = isProcessed && (returnedIncs?.[item] === false || missingList.includes(item));
+                                if (isLost) {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/40 shadow-2xs"
+                                    >
+                                      <X className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                                      <span>{item}</span>
+                                      <span className="text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white px-1.5 py-0.2 rounded">LOST</span>
+                                    </span>
+                                  );
+                                }
+                                if (isProcessed) {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 shadow-2xs"
+                                    >
+                                      <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                      <span>{item}</span>
+                                      <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Returned</span>
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-primary/10 text-primary border border-primary/20"
+                                  >
+                                    <Package className="h-3 w-3" />
+                                    {item}
+                                  </span>
+                                );
+                              })}
+                            </div>
+
+                            {lostAccs.length > 0 && (
+                              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-xs text-rose-800 dark:text-rose-300">
+                                  <AlertOctagon className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                                  <span>Recorded Lost Accessories ({lostAccs.length}):</span>
+                                </div>
+                                <p className="text-[11px] text-rose-900/90 dark:text-rose-200">
+                                  Not returned by borrower: <strong className="font-bold underline">{lostAccs.join(', ')}</strong>
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {(detailsBorrowing.status === 'RETURNED' || isDamagedPendingRecord(detailsBorrowing)) && (
                         <>
+                          {isDamagedPendingRecord(detailsBorrowing) && (
+                            <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs space-y-1.5 my-1">
+                              <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                <span>
+                                  {(() => {
+                                    const cond = (detailsBorrowing.returnCondition || '').toLowerCase();
+                                    if (cond.includes('lost') || cond.includes('nawala')) return 'Pending Resolution (Lost Equipment)';
+                                    if (cond.includes('missing')) return 'Pending Resolution (Missing Accessories)';
+                                    return 'Pending Resolution (Damaged Item)';
+                                  })()}
+                                </span>
+                              </div>
+                              <p className="text-[11px] leading-relaxed opacity-95">
+                                {(() => {
+                                  const cond = (detailsBorrowing.returnCondition || '').toLowerCase();
+                                  if (cond.includes('lost') || cond.includes('nawala')) {
+                                    return 'This equipment was declared lost. Replace the item or record replacement/settlement to complete the resolution.';
+                                  }
+                                  if (cond.includes('missing')) {
+                                    return 'Some gear/accessories were reported missing. Return the missing items or replace them to complete resolution.';
+                                  }
+                                  return 'This item is damaged and pending resolution. Repair or replace the equipment to complete the return.';
+                                })()}
+                              </p>
+                              {detailsBorrowing.dueDate && (
+                                <div className="flex items-center gap-1.5 font-bold text-xs text-amber-950 dark:text-amber-200 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                                  <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span>
+                                    Target Resolution Deadline: {new Date(detailsBorrowing.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {new Date(detailsBorrowing.dueDate) < new Date() && (
+                                      <span className="ml-1 text-destructive font-black uppercase tracking-wider text-[10px]">(OVERDUE)</span>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => {
+                                  setEditReturnCondition('Resolved');
+                                  setEditStatus('RETURNED');
+                                  setEditReturnNotes(detailsBorrowing.returnNotes ? `${detailsBorrowing.returnNotes}\n[Resolved]: ` : '');
+                                  setResolveEvidencePhoto(null);
+                                  setIsEditingDetails(true);
+                                }}
+                                className="mt-1 h-7 px-3 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg gap-1.5 cursor-pointer shadow-2xs"
+                              >
+                                <Wrench className="h-3 w-3" />
+                                Resolve
+                              </Button>
+                            </div>
+                          )}
+
                           <div className="flex items-center gap-2">
                             <strong>Return Condition:</strong>
                             <Badge
                               variant="outline"
                               className={cn(
                                 "text-[10px] font-bold",
-                                (detailsBorrowing.returnCondition || '').toLowerCase().includes('damage')
+                                (detailsBorrowing.returnCondition || '').toLowerCase().includes('lost')
+                                  ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40'
+                                  : (detailsBorrowing.returnCondition || '').toLowerCase().includes('missing')
+                                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40'
+                                  : (detailsBorrowing.returnCondition || '').toLowerCase().includes('damage') || isDamagedPendingRecord(detailsBorrowing)
                                   ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30'
-                                  : ['repaired', 'replaced', 'naayos', 'napalitan'].some(k => (detailsBorrowing.returnCondition || '').toLowerCase().includes(k))
+                                  : ['resolved', 'repaired', 'replaced', 'naayos', 'napalitan'].some(k => (detailsBorrowing.returnCondition || '').toLowerCase().includes(k))
                                   ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30'
                                   : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
                               )}
                             >
-                              {detailsBorrowing.returnCondition || 'Good'}
+                              {(() => {
+                                const cond = (detailsBorrowing.returnCondition || '').toLowerCase();
+                                if (['resolved', 'repaired', 'replaced', 'naayos', 'napalitan'].some(k => cond.includes(k))) return 'Resolved';
+                                if (cond.includes('lost') || cond.includes('nawala')) return 'Lost';
+                                if (cond.includes('missing')) return detailsBorrowing.returnCondition || 'Missing Gear';
+                                if (cond.includes('damag') || isDamagedPendingRecord(detailsBorrowing)) return 'Damaged';
+                                return detailsBorrowing.returnCondition || 'Good Condition';
+                              })()}
                             </Badge>
                           </div>
                           {detailsBorrowing.returnNotes && (
@@ -1899,83 +3101,162 @@ export function BorrowingsPanel() {
                     </div>
                   )}
 
-                  {detailsBorrowing.returnPhotos && detailsBorrowing.returnPhotos.length > 0 && (
-                    <div className="pt-2 border-t border-border/50">
-                      <span className="text-[11px] font-bold text-destructive flex items-center gap-1 mb-1.5">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Damage Photo Evidence:
-                      </span>
-                      <div className="grid grid-cols-2 gap-2">
-                        {detailsBorrowing.returnPhotos.map((photo: string, idx: number) => (
-                          <a
-                            key={idx}
-                            href={photo}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="relative aspect-video rounded-lg overflow-hidden border border-border/70 bg-black/5 hover:opacity-90 transition-opacity block group"
-                          >
-                            <img
-                              src={photo}
-                              alt={`Damage evidence ${idx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <span className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-white font-semibold transition-opacity">
-                              View Full
-                            </span>
-                          </a>
-                        ))}
+                  {Boolean(detailsBorrowing.returnPhotos && detailsBorrowing.returnPhotos.length > 0) && (() => {
+                    const returnPhotosList = detailsBorrowing.returnPhotos || [];
+                    const condLower = (detailsBorrowing.returnCondition || '').toLowerCase();
+                    const isResolvedRecord = ['resolved', 'repaired', 'replaced', 'naayos', 'napalitan', 'good'].some(k => condLower.includes(k));
+
+                    return (
+                      <div className="pt-2 border-t border-border/50 space-y-2">
+                        <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                          <Camera className="h-3.5 w-3.5 text-primary" /> Photo Evidence:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {returnPhotosList.map((photo: string, idx: number) => {
+                            const isResolutionPhoto = returnPhotosList.length > 1
+                              ? idx > 0
+                              : isResolvedRecord;
+
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <span className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1",
+                                isResolutionPhoto
+                                  ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30"
+                                  : "bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/30"
+                              )}>
+                                {isResolutionPhoto ? (
+                                  <><CheckCircle className="h-2.5 w-2.5" /> Resolution Evidence (Okay)</>
+                                ) : (
+                                  <><AlertTriangle className="h-2.5 w-2.5" /> Damage Evidence (Before)</>
+                                )}
+                              </span>
+                              <a
+                                href={photo}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="relative aspect-video rounded-lg overflow-hidden border border-border/70 bg-black/5 hover:opacity-90 transition-opacity block group shadow-2xs"
+                              >
+                                <img
+                                  src={photo}
+                                  alt={isResolutionPhoto ? "Resolution evidence" : `Damage evidence ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-white font-semibold transition-opacity">
+                                  View Full Image
+                                </span>
+                              </a>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 </div>
 
                 {/* ── STICKY MODAL FOOTER ── */}
-                <DialogFooter className="p-3.5 sm:p-4 border-t border-border/70 bg-card/95 backdrop-blur-md shrink-0 flex flex-row items-center justify-end gap-2 w-full min-w-0">
-                  {isEditingDetails ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-9 sm:h-10 rounded-xl text-xs sm:text-sm font-semibold border-border/80 hover:bg-muted/50 cursor-pointer flex-1 sm:flex-initial"
-                        onClick={() => setIsEditingDetails(false)}
-                        disabled={isSavingDetails}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        className="h-9 sm:h-10 rounded-xl text-xs sm:text-sm font-bold bg-sidebar hover:bg-sidebar/90 text-white cursor-pointer flex-1 sm:flex-initial shadow-xs"
-                        onClick={handleSaveDetails}
-                        disabled={isSavingDetails}
-                      >
-                        {isSavingDetails ? (
-                          <><LoaderCircle className="h-4 w-4 mr-1.5 animate-spin" /> Saving…</>
-                        ) : (
-                          <><Save className="h-4 w-4 mr-1.5" /> Save Updates</>
-                        )}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-9 sm:h-10 rounded-xl text-xs sm:text-sm font-semibold border-sidebar/30 text-sidebar hover:bg-sidebar/10 cursor-pointer flex-1 sm:flex-initial"
-                        onClick={() => setIsEditingDetails(true)}
-                      >
-                        <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit Status &amp; Notes
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-9 sm:h-10 rounded-xl text-xs sm:text-sm font-semibold border-border/80 hover:bg-muted/50 cursor-pointer flex-1 sm:flex-initial"
-                        onClick={() => setDetailsBorrowing(null)}
-                      >
-                        Close
-                      </Button>
-                    </>
-                  )}
+                <DialogFooter className="p-2.5 sm:p-3 border-t border-border/70 bg-card/95 backdrop-blur-md shrink-0 w-full min-w-0">
+                  <div className="flex flex-row items-center justify-between gap-1.5 sm:gap-2 w-full min-w-0">
+                    {/* LEFT — Download Report (only for damaged / lost / missing) */}
+                    <div className="flex-shrink-0">
+                      {detailsBorrowing && (
+                        isDamagedPendingRecord(detailsBorrowing) ||
+                        (detailsBorrowing.returnCondition || '').toLowerCase().includes('lost') ||
+                        (detailsBorrowing.returnCondition || '').toLowerCase().includes('missing')
+                      ) ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-lg text-xs font-medium border-sidebar/40 text-sidebar dark:text-sky-400 hover:bg-sidebar/10 cursor-pointer gap-1.5 shrink-0"
+                          onClick={() => detailsBorrowing && handleDownloadIncidentReport(detailsBorrowing)}
+                          disabled={isGeneratingReport || isSavingDetails}
+                        >
+                          {isGeneratingReport ? (
+                            <><LoaderCircle className="h-3 w-3 animate-spin shrink-0" /> <span className="hidden xs:inline">Generating…</span><span className="xs:hidden">...</span></>
+                          ) : (
+                            <><FileDown className="h-3.5 w-3.5 shrink-0" /> <span>Download Report</span></>
+                          )}
+                        </Button>
+                      ) : (
+                        <span /> /* spacer to keep right side flush */
+                      )}
+                    </div>
+
+                    {/* RIGHT — primary actions */}
+                    <div className="flex flex-row items-center gap-1.5 sm:gap-2 shrink-0">
+                      {isEditingDetails ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-lg text-xs font-medium border-border/80 hover:bg-muted/50 cursor-pointer shrink-0"
+                            onClick={() => setIsEditingDetails(false)}
+                            disabled={isSavingDetails}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            className={cn(
+                              "h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-lg text-xs font-semibold text-white cursor-pointer shadow-xs transition-colors shrink-0",
+                              editReturnCondition === 'Resolved' || editReturnCondition === 'Repaired' || editReturnCondition === 'Replaced'
+                                ? "bg-emerald-600 hover:bg-emerald-700"
+                                : "bg-sidebar hover:bg-sidebar/90"
+                            )}
+                            onClick={handleSaveDetails}
+                            disabled={isSavingDetails || isUploadingResolvePhoto}
+                          >
+                            {isSavingDetails ? (
+                              <><LoaderCircle className="h-3.5 w-3.5 mr-1 animate-spin shrink-0" /> Saving…</>
+                            ) : editReturnCondition === 'Resolved' || editReturnCondition === 'Repaired' || editReturnCondition === 'Replaced' ? (
+                              <><CheckCircle className="h-3.5 w-3.5 mr-1 shrink-0" /> Complete Return</>
+                            ) : (
+                              <><Save className="h-3.5 w-3.5 mr-1 shrink-0" /> Save Updates</>
+                            )}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              "h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-lg text-xs font-medium cursor-pointer shrink-0",
+                              isDamagedPendingRecord(detailsBorrowing)
+                                ? "border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                                : "border-sidebar/30 text-sidebar hover:bg-sidebar/10"
+                            )}
+                            onClick={() => {
+                              if (isDamagedPendingRecord(detailsBorrowing)) {
+                                setEditReturnCondition('Resolved');
+                                setEditStatus('RETURNED');
+                                setEditReturnNotes(detailsBorrowing.returnNotes ? `${detailsBorrowing.returnNotes}\n[Resolved]: ` : '');
+                                setResolveEvidencePhoto(null);
+                              }
+                              setIsEditingDetails(true);
+                            }}
+                          >
+                            {isDamagedPendingRecord(detailsBorrowing) ? (
+                              <><Wrench className="h-3.5 w-3.5 mr-1 text-amber-600 dark:text-amber-400 shrink-0" /> Resolve</>
+                            ) : (
+                              <><Pencil className="h-3.5 w-3.5 mr-1 shrink-0" /> Edit Details</>
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-lg text-xs font-medium border-border/80 hover:bg-muted/50 cursor-pointer shrink-0"
+                            onClick={() => setDetailsBorrowing(null)}
+                          >
+                            Close
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </DialogFooter>
               </div>
             )}

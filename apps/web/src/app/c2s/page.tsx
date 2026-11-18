@@ -604,6 +604,50 @@ const DevotionForm = ({
     };
   }, [manualType, selectedMenteeName, allDevotions, devotion, flatCurriculum]);
 
+  // Check if selected mentee has completed ALL C2S Devotional Manual lessons
+  const { isC2SDevotionalComplete, c2sCompletedCount, c2sTotalLessons } = useMemo(() => {
+    const c2sModules = C2S_CURRICULUM["C2S Devotional Manual"] || [];
+    const totalC2SLessons = c2sModules.reduce((acc, m) => acc + m.lessons.length, 0);
+
+    if (!selectedMenteeName) return { isC2SDevotionalComplete: false, c2sCompletedCount: 0, c2sTotalLessons: totalC2SLessons };
+
+    const menteeNameLower = selectedMenteeName.toLowerCase().trim();
+    const c2sDevos = (allDevotions || []).filter((d) => {
+      if (!menteeNameLower) return false;
+      const isMentee = d.attendeeNames?.some(
+        (n) => n.toLowerCase().trim() === menteeNameLower
+      );
+      if (!isMentee) return false;
+      if (devotion?.id && d.id === devotion.id) return false;
+      return (d.manualType || "C2S Devotional Manual") === "C2S Devotional Manual";
+    });
+
+    const c2sFlat: { moduleName: string; lessonName: string; globalIndex: number }[] = [];
+    let gIdx = 0;
+    c2sModules.forEach((mod) => {
+      mod.lessons.forEach((les) => {
+        c2sFlat.push({ moduleName: mod.module, lessonName: les, globalIndex: gIdx++ });
+      });
+    });
+
+    const completedC2S = new Set<number>();
+    c2sDevos.forEach((d) => {
+      const found = c2sFlat.find(
+        (item) =>
+          (d.lessonName && item.lessonName.toLowerCase() === d.lessonName.toLowerCase()) ||
+          (d.topic && item.lessonName.toLowerCase() === d.topic.toLowerCase()) ||
+          (d.moduleName && d.lessonName && item.moduleName === d.moduleName && item.lessonName === d.lessonName)
+      );
+      if (found) completedC2S.add(found.globalIndex);
+    });
+
+    return {
+      isC2SDevotionalComplete: completedC2S.size >= totalC2SLessons,
+      c2sCompletedCount: completedC2S.size,
+      c2sTotalLessons: totalC2SLessons,
+    };
+  }, [selectedMenteeName, allDevotions, devotion]);
+
   // Automatically select the next available lesson when mentee or manual changes (for new devotion)
   useEffect(() => {
     if (!devotion && selectedMenteeName) {
@@ -613,7 +657,22 @@ const DevotionForm = ({
     }
   }, [selectedMenteeName, manualType, nextAvailableModule, nextAvailableLesson, devotion]);
 
+  // Reset to C2S Devotional Manual if Mentor's Manual is selected but not yet unlocked
+  useEffect(() => {
+    if (manualType === "Mentor's Manual" && !isC2SDevotionalComplete && !devotion) {
+      setManualType("C2S Devotional Manual");
+    }
+  }, [selectedMenteeName, isC2SDevotionalComplete, devotion, manualType]);
+
   const handleManualChange = (newManual: string) => {
+    if (newManual === "Mentor's Manual" && !isC2SDevotionalComplete) {
+      toast({
+        variant: "destructive",
+        title: "C2S Devotional Manual Required",
+        description: `Complete all ${c2sTotalLessons} lessons in the C2S Devotional Manual before accessing the Mentor's Manual. (${c2sCompletedCount}/${c2sTotalLessons} done)`,
+      });
+      return;
+    }
     setManualType(newManual);
     const newModules = C2S_CURRICULUM[newManual] || [];
 
@@ -1015,26 +1074,49 @@ const DevotionForm = ({
             </div>
             <BookOpen className="h-3.5 w-3.5 shrink-0" />
             <span className="text-xs">C2S Devotional Manual</span>
+            {selectedMenteeName && (
+              <span className={cn(
+                "ml-auto text-[10px] font-bold shrink-0 px-1.5 py-0.5 rounded-full",
+                isC2SDevotionalComplete
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+              )}>
+                {isC2SDevotionalComplete ? "✓ Done" : `${c2sCompletedCount}/${c2sTotalLessons}`}
+              </span>
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => handleManualChange("Mentor's Manual")}
+            disabled={!isC2SDevotionalComplete}
             className={cn(
-              "flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer",
-              manualType === "Mentor's Manual"
-                ? "border-sidebar bg-sidebar/5 dark:bg-sidebar/10 text-sidebar dark:text-sky-400 font-bold shadow-2xs ring-1 ring-sidebar/30"
-                : "border-slate-200/90 dark:border-border/80 bg-white dark:bg-background hover:bg-slate-50 dark:hover:bg-muted/30 text-muted-foreground"
+              "flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all",
+              !isC2SDevotionalComplete
+                ? "border-slate-200/60 dark:border-border/40 bg-slate-50/80 dark:bg-muted/10 text-muted-foreground/50 cursor-not-allowed opacity-60"
+                : manualType === "Mentor's Manual"
+                ? "border-sidebar bg-sidebar/5 dark:bg-sidebar/10 text-sidebar dark:text-sky-400 font-bold shadow-2xs ring-1 ring-sidebar/30 cursor-pointer"
+                : "border-slate-200/90 dark:border-border/80 bg-white dark:bg-background hover:bg-slate-50 dark:hover:bg-muted/30 text-muted-foreground cursor-pointer"
             )}
           >
             <div className={cn(
               "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-              manualType === "Mentor's Manual" ? "border-sidebar bg-sidebar text-white" : "border-slate-300"
+              !isC2SDevotionalComplete
+                ? "border-slate-300/50 dark:border-border/40"
+                : manualType === "Mentor's Manual" ? "border-sidebar bg-sidebar text-white" : "border-slate-300"
             )}>
-              {manualType === "Mentor's Manual" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+              {manualType === "Mentor's Manual" && isC2SDevotionalComplete && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
             </div>
-            <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+            {!isC2SDevotionalComplete
+              ? <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+              : <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+            }
             <span className="text-xs">Mentor's Manual</span>
+            {!isC2SDevotionalComplete && selectedMenteeName && (
+              <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400 shrink-0">
+                Complete C2S first
+              </span>
+            )}
           </button>
         </div>
 
@@ -1048,15 +1130,28 @@ const DevotionForm = ({
               </SelectTrigger>
               <SelectContent className="max-h-60 rounded-xl border border-border shadow-xl">
                 {availableModules.map((m, mIdx) => {
-                  const isModuleUnlocked = mIdx <= highestUnlockedModuleIndex;
+                  // Module is the current active module (has the next lesson to complete)
+                  const isCurrentModule = mIdx === highestUnlockedModuleIndex;
+                  // Module is fully completed (all its lessons are done)
+                  const moduleFlat = flatCurriculum.filter((item) => item.moduleName === m.module);
+                  const isModuleFullyCompleted = moduleFlat.length > 0 && moduleFlat.every((item) => completedGlobalIndices.has(item.globalIndex));
+                  // Only the current active module can be selected; completed and future modules are locked
+                  const isModuleSelectable = isCurrentModule && !isModuleFullyCompleted;
                   return (
                     <SelectItem
                       key={m.module}
                       value={m.module}
-                      disabled={!isModuleUnlocked}
-                      className="text-xs font-medium cursor-pointer"
+                      disabled={!isModuleSelectable}
+                      className={cn(
+                        "text-xs font-medium",
+                        isModuleFullyCompleted
+                          ? "line-through text-muted-foreground/40 cursor-not-allowed"
+                          : isModuleSelectable
+                          ? "cursor-pointer font-semibold"
+                          : "text-muted-foreground/50 cursor-not-allowed"
+                      )}
                     >
-                      {m.module}
+                      {isModuleFullyCompleted ? `✓ ${m.module}` : m.module}
                     </SelectItem>
                   );
                 })}
@@ -1078,18 +1173,27 @@ const DevotionForm = ({
                   const isCompleted = lessonItem
                     ? completedGlobalIndices.has(lessonItem.globalIndex)
                     : false;
-                  const isUnlocked = lessonItem
-                    ? lessonItem.globalIndex <= maxUnlockedIndex || isCompleted
+                  // Only the next uncompleted lesson (maxUnlockedIndex) is selectable
+                  // Completed lessons and future locked lessons are both disabled
+                  const isNextLesson = lessonItem
+                    ? lessonItem.globalIndex === maxUnlockedIndex && !isCompleted
                     : false;
 
                   return (
                     <SelectItem
                       key={l}
                       value={l}
-                      disabled={!isUnlocked}
-                      className="text-xs font-medium cursor-pointer"
+                      disabled={!isNextLesson}
+                      className={cn(
+                        "text-xs font-medium",
+                        isCompleted
+                          ? "line-through text-muted-foreground/40 cursor-not-allowed"
+                          : isNextLesson
+                          ? "cursor-pointer font-semibold"
+                          : "text-muted-foreground/50 cursor-not-allowed"
+                      )}
                     >
-                      {l}
+                      {isCompleted ? `✓ ${l}` : l}
                     </SelectItem>
                   );
                 })}

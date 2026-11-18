@@ -73,6 +73,7 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
     isKit: false,
     isApprovalRequired: false,
     nextMaintenanceDate: '',
+    expiryDate: '',
     aisle: '',
     shelf: '',
     bin: '',
@@ -173,6 +174,9 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
         nextMaintenanceDate: item.nextMaintenanceDate
           ? new Date(item.nextMaintenanceDate).toISOString().split('T')[0]
           : '',
+        expiryDate: item.expiryDate
+          ? new Date(item.expiryDate).toISOString().split('T')[0]
+          : '',
         aisle: item.aisle || '',
         shelf: item.shelf || '',
         bin: item.bin || '',
@@ -195,6 +199,7 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
         isKit: false,
         isApprovalRequired: false,
         nextMaintenanceDate: '',
+        expiryDate: '',
         aisle: '',
         shelf: '',
         bin: '',
@@ -268,6 +273,7 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
     try {
       const actorData = {
         ...formData,
+        expiryDate: formData.type === 'CONSUMABLE' ? (formData.expiryDate || null) : null,
         actorId: workerProfile?.id || user?.id || null,
         actorName: workerProfile ? `${workerProfile.firstName} ${workerProfile.lastName}`.trim() : (user?.displayName || user?.email || 'Admin'),
         actorEmail: user?.email || workerProfile?.email || null,
@@ -563,6 +569,29 @@ export function ItemModal({ isOpen, onClose, item, onSaved }: ItemModalProps) {
                     className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 text-foreground font-medium focus-visible:ring-1 focus-visible:ring-sidebar/40 focus-visible:border-sidebar transition-all"
                   />
                 </div>
+
+                {/* Expiration Date — CONSUMABLE ONLY */}
+                {formData.type === 'CONSUMABLE' && (
+                  <div className="space-y-1.5 min-w-0">
+                    <Label htmlFor="expiry-date" className="text-xs font-semibold text-foreground/85 flex items-center gap-1.5">
+                      <span>Expiration Date</span>
+                      <span className="text-[10px] text-amber-600 font-normal">(Consumable only)</span>
+                    </Label>
+                    <input
+                      id="expiry-date"
+                      type="date"
+                      value={formData.expiryDate}
+                      onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                      className="w-full min-w-0 h-9 px-3 text-xs rounded-xl bg-background border border-border/70 text-foreground font-medium shadow-2xs focus:outline-none focus:ring-1 focus:ring-sidebar/40 focus:border-sidebar transition-all cursor-pointer"
+                    />
+                    {formData.expiryDate && new Date(formData.expiryDate) < new Date() && (
+                      <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        This item is expired. It cannot be issued to workers.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -64,6 +64,8 @@
     "embla-carousel-react": "^8.6.0",
     "graphql": "^16.11.0",
     "graphql-tag": "^2.12.6",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.475.0",
     "next": "^16.2.4",
