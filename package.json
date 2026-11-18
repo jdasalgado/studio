@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "turbo run build",
+    "build": "turbo run build --filter=web",
     "build:web": "turbo run build --filter=web",
     "dev": "turbo run dev",
     "dev:web": "turbo run dev --filter=web",
