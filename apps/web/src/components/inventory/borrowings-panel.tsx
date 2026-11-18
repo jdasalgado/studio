@@ -2648,8 +2648,13 @@ export function BorrowingsPanel() {
                             <SelectContent>
                               <SelectItem value="Good Condition" className="text-xs font-medium">Good Condition</SelectItem>
                               <SelectItem value="Damaged" className="text-xs text-destructive font-semibold">Damaged</SelectItem>
+<<<<<<< HEAD
                               <SelectItem value="Lost" className="text-xs text-rose-600 font-semibold">Lost / Missing</SelectItem>
                               <SelectItem value="Resolved" className="text-xs text-emerald-600 font-semibold">Resolved (Repaired / Replaced)</SelectItem>
+=======
+                              <SelectItem value="Repaired" className="text-xs text-emerald-600 font-semibold">Repaired</SelectItem>
+                              <SelectItem value="Replaced" className="text-xs text-blue-600 font-semibold">Replaced</SelectItem>
+>>>>>>> 3a2667343429984bb3cc872c980c50feff16d9ea
                               <SelectItem value="Under Repair" className="text-xs text-amber-600 font-semibold">Under Repair / Maintenance</SelectItem>
                             </SelectContent>
                           </Select>
@@ -2796,7 +2801,11 @@ export function BorrowingsPanel() {
                           value={editReturnNotes}
                           maxLength={1000}
                           onChange={(e) => setEditReturnNotes(e.target.value)}
+<<<<<<< HEAD
                           placeholder="Describe any maintenance or replacement details (e.g., Replaced camera lens, repaired charging port)..."
+=======
+                          placeholder="Describe any parts that were damaged, repaired, or replaced (e.g., Replaced camera lens, repaired charging port)..."
+>>>>>>> 3a2667343429984bb3cc872c980c50feff16d9ea
                           className="text-xs rounded-xl min-h-[75px] bg-background resize-none leading-relaxed"
                         />
                       </div>
